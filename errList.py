@@ -37,6 +37,7 @@ ERR_FOCUS_NOT_FOUND = -28           # no autofocus peak found before maximum tri
 ERR_STEP_LIMIT = -29                # exceeding the maximum number of steps
 ERR_FOCUS_PAST_PEAK = -30           # auto focus started past peak
 ERR_NO_COMMUNICATION = -31          # no communication/ response from MCR board
+ERR_MOVE_TIMEOUT = -32              # no response before timeout
 
 # IMHR machine errors
 ERR_IMHR_ANGLE = -35                # object angle arm setup error
@@ -124,6 +125,7 @@ def decipher(errNum):
         ERR_STEP_LIMIT: 'exceeded maximum number of steps avaialble', \
         ERR_FOCUS_PAST_PEAK: 'autofocus started past peak', \
         ERR_NO_COMMUNICATION: 'no communication/ response from MCR board', \
+        ERR_MOVE_TIMEOUT: 'no response before timeout', \
         
         # IMHR machine errors
         ERR_IMHR_ANGLE: 'IMHR object angle arm setup error', \

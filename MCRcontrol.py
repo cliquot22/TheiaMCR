@@ -5,9 +5,8 @@
 #   also if a response is received from the test command (FW version request)
 # initialize motors with focusInit, zoomInit, irisInit, IRCInit to set max steps and speed ranges
 # home motors with focusHome, zoomHome, irisHome, and IRCHome to set motors to PI or 0 limits
-#
-# v.1.0.0 220217
 import serial
+import time
 import TheiaMCR.errList as err
 import logging as log
 
@@ -19,6 +18,7 @@ serialPort = ''
 
 # internal variables
 # constants
+RESPONSE_READ_TIME = 500                # (ms) max time for the MCR to post a response in the buffer
 OK = 0
 constMCRFocusMotor = 0x01
 constMCRZoomMotor = 0x02
@@ -65,15 +65,11 @@ def MCRInit(com:str, tracePrint:bool=False):
     try:
         serialPort = serial.Serial(port = com, baudrate=115200, bytesize=8, timeout=0.1, stopbits=serial.STOPBITS_ONE)
         success = int(com[3:])
+        log.debug(f'Comport {success} communication success')
     except serial.SerialException as e:
         log.error("Serial port not open {}".format(e))
         err.saveError(err.ERR_SERIAL_PORT, err.MOD_MCR, err.errLine())
         return err.ERR_SERIAL_PORT
-    #********* confirm port is opened, return error to GUI
-    #if not success:
-    #    # port open failure
-    #    return False
-    #    break;
 
     # send a test command to the board to read FW version
     response = ""
@@ -223,7 +219,6 @@ def zoomHome() -> tuple[int, int]:
 #       err_bad_move: if there is a home error
 #       err_param: if there is an input error
 def focusAbs(step, speed = 1000):
-    global MCRFocusStep
     if step < 0:
         log.error("Error: focus cannot move abs < 0")
         return err.ERR_RANGE, 0
@@ -241,7 +236,7 @@ def focusAbs(step, speed = 1000):
     if error != 0:
         # propogate error
         err.saveError(error, err.MOD_MCR, err.errLine())
-        return error, 0
+        return error, finalStep
     return OK, finalStep
 
 # focusRel
@@ -278,12 +273,10 @@ def focusRel(steps, speed = 1000, correctForBL = True):
         # no need for backlash adjustment
         success = MCRMove(constMCRFocusMotor, steps, constMCRFZDefaultSpeed)
         
-    if success:
-        MCRFocusStep += steps
-    else:
-        MCRFocusStep = 0
+    MCRFocusStep += steps
+    if not success:
         err.saveError(err.ERR_BAD_MOVE, err.MOD_MCR, err.errLine())
-        return err.ERR_BAD_MOVE, 0
+        return err.ERR_BAD_MOVE, MCRFocusStep
 
     return OK, MCRFocusStep
 
@@ -350,7 +343,7 @@ def zoomAbs(step, speed = 1000):
     if error != 0:
         # propogate error
         err.saveError(error, err.MOD_MCR, err.errLine())
-        return error, 0
+        return error, finalStep
     return OK, finalStep
 
 # zoomRel
@@ -387,12 +380,10 @@ def zoomRel(steps, speed = 1000, correctForBL = True):
         # no need for backlash adjustment
         success = MCRMove(constMCRZoomMotor, steps, constMCRFZDefaultSpeed)
 
-    if success:
-        MCRZoomStep = MCRZoomStep + steps
-    else:
-        MCRZoomStep = 0
+    MCRZoomStep = MCRZoomStep + steps
+    if not success:
         err.saveError(err.ERR_BAD_MOVE, err.MOD_MCR, err.errLine())
-        return err.ERR_BAD_MOVE, 0
+        return err.ERR_BAD_MOVE, MCRZoomStep
 
     return OK, MCRZoomStep
 
@@ -521,7 +512,7 @@ def readFWRevision() -> str:
     cmd[1] = 0x0D
     response = MCRSendCmd(cmd)
     fw = ''
-    if len(response) == 0:
+    if response == None:
         log.error("Error: No resonse received from MCR controller")
         err.saveError(err.ERR_SERIAL_PORT, err.MOD_MCR, err.errLine())
     else:
@@ -541,7 +532,7 @@ def readBoardSN() -> str:
     cmd[1] = 0x0D
     response = MCRSendCmd(cmd)
     sn = ''
-    if len(response) == 0:
+    if response == None:
         log.error("Error: No resonse received from MCR controller")
         err.saveError(err.ERR_SERIAL_PORT, err.MOD_MCR, err.errLine())
     else:
@@ -559,27 +550,48 @@ def readBoardSN() -> str:
 # MCRSendCmd
 # send the byte string to the MCR
 # input: cmd: byte string to send
-#       waitTime: (ms) wait for response
+#       waitTime: (ms) wait before checking for a response
 # return: return string from MCR
-def MCRSendCmd(cmd, waitTime = 100):
+def MCRSendCmd(cmd, waitTime:int=10):
     global serialPort
     # send the string
     if tracePrintMCR == True:
         log.debug("   -> {}".format(":".join("{:02x}".format(c) for c in cmd)))
     serialPort.write(cmd)
 
-    # wait for a response
+    # wait for a response (wait first then read the response)
     response = bytearray(12)
-    while(1): 
+    readSuccess = False
+    startTime = time.time() * 1000
+    while(time.time() * 1000 - waitTime < startTime): 
+        # wait until finished moving or until PI triggers serial port buffer response
+        if serialPort.in_waiting > 0: break
+        time.sleep(0.1)
+    # read the response
+    startTime = time.time() * 1000
+    while (time.time() * 1000 - RESPONSE_READ_TIME < startTime): 
         # Wait until there is data waiting in the serial buffer
-        if(serialPort.in_waiting > 0):
-            # Read data out of the buffer until a carraige return / new line is found
+        if (serialPort.in_waiting > 0):
+            # Read data out of the buffer until a carraige return / new line is found or until 12 bytes are read
             response = serialPort.readline()
+            readSuccess = True
             break
+        else:
+            time.sleep(0.1)
+
+    if not readSuccess:
+        # timed out
+        response[0] = 0x74
+        response[1] = 0x01      # not successful
+        response[2] = 0x0D
+        log.warning("MCR send command timed out without response")
 
     # return response
     if tracePrintMCR == True:
-        log.debug("   <- {}".format(":".join("{:02x}".format(c) for c in response)))
+        if response != None:
+            log.debug("   <- {}".format(":".join("{:02x}".format(c) for c in response)))
+        else: 
+            log.debug("  <- None")
     return response
 
 # MCRMotorInit
@@ -757,12 +769,13 @@ def MCRMove(id:int, steps:int, speed:int) -> bool:
     cmd[6] = bSpeed[1]
 
     # send the command
+    waitTime = int((steps * 1050) / speed)  # add 5% to accont for slightly slow speed compared to set speed (noticed error on 8000 steps)
     response = bytearray(12)
-    response = MCRSendCmd(cmd, steps/speed)
+    response = MCRSendCmd(cmd, waitTime)
 
     success = True
     if response[1] != 0x00:
         log.error("Error: move motor response")
-        err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
+        err.saveError(err.ERR_MOVE_TIMEOUT, err.MOD_MCR, err.errLine())
         success = False
     return success
