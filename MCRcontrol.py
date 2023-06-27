@@ -214,11 +214,12 @@ def zoomHome() -> tuple[int, int]:
 # move the focus motor to absolute step number
 # input: step: the step to move to
 #       speed (optional): the pps speed
+#       correctForBL (optional): correct for backlash when moving toward PI
 # globals: set MCRFocusStep
 # return: the final step number
 #       err_bad_move: if there is a home error
 #       err_param: if there is an input error
-def focusAbs(step, speed = 1000):
+def focusAbs(step:int, speed:int=1000, correctForBL:bool=True):
     if step < 0:
         log.error("Error: focus cannot move abs < 0")
         return err.ERR_RANGE, 0
@@ -232,7 +233,7 @@ def focusAbs(step, speed = 1000):
 
     # move to absolute position
     steps = step - MCRFocusPI
-    error, finalStep = focusRel(steps, speed)
+    error, finalStep = focusRel(steps, speed, correctForBL)
     if error != 0:
         # propogate error
         err.saveError(error, err.MOD_MCR, err.errLine())
@@ -249,7 +250,7 @@ def focusAbs(step, speed = 1000):
 # global: set MCRFocusStep
 # return: error,
 #       the final step number
-def focusRel(steps, speed = 1000, correctForBL = True):
+def focusRel(steps, speed=constMCRFZDefaultSpeed, correctForBL = True):
     global MCRFocusStep
     if steps == 0:
         return OK, MCRFocusStep
@@ -267,11 +268,11 @@ def focusRel(steps, speed = 1000, correctForBL = True):
         if (abs(MCRFocusPI - (steps + MCRFocusStep)) < constBacklash) and MCRFocusRespectLimit:
             blCorrection = abs(MCRFocusPI - (steps + MCRFocusStep))
 
-        success = MCRMove(constMCRFocusMotor, steps + MCRFocusPISide * blCorrection, constMCRFZDefaultSpeed)
-        success = MCRMove(constMCRFocusMotor, -MCRFocusPISide * blCorrection, constMCRFZDefaultSpeed)
+        success = MCRMove(constMCRFocusMotor, steps + MCRFocusPISide * blCorrection, speed)
+        success = MCRMove(constMCRFocusMotor, -MCRFocusPISide * blCorrection, speed)
     else:
         # no need for backlash adjustment
-        success = MCRMove(constMCRFocusMotor, steps, constMCRFZDefaultSpeed)
+        success = MCRMove(constMCRFocusMotor, steps, speed)
         
     MCRFocusStep += steps
     if not success:
@@ -322,10 +323,11 @@ def focusCheckLimits(steps, limitStep = False):
 # move the zoom motor to absolute step number
 # input: step: the step to move to
 #       speed (optional): the pps speed
+#       correctForBL (optional): correct for backlash when moving toward PI
 # return: the final step number
 #       err_bad_move: if there is a home error
 #       err_param: if there is an input error
-def zoomAbs(step, speed = 1000):
+def zoomAbs(step:int, speed:int=1000, correctForBL:bool=True):
     if step < 0:
         log.error("Error: zoom cannot move abs < 0")
         return err.ERR_RANGE, 0
@@ -339,7 +341,7 @@ def zoomAbs(step, speed = 1000):
 
     # move to absolute position
     steps = step - MCRZoomPI
-    error, finalStep = zoomRel(steps, speed)
+    error, finalStep = zoomRel(steps, speed, correctForBL)
     if error != 0:
         # propogate error
         err.saveError(error, err.MOD_MCR, err.errLine())
@@ -356,7 +358,7 @@ def zoomAbs(step, speed = 1000):
 # globals: set MCRZoomStep
 # return: the final step number
 #       err_bad_move: if there is an error
-def zoomRel(steps, speed = 1000, correctForBL = True):
+def zoomRel(steps, speed=constMCRFZDefaultSpeed, correctForBL = True):
     global MCRZoomStep
     if steps == 0:
         return OK, MCRZoomStep 
@@ -374,11 +376,11 @@ def zoomRel(steps, speed = 1000, correctForBL = True):
         if (abs(MCRZoomPI - (steps + MCRZoomStep)) < constBacklash) and MCRZoomRespectLimit:
             blCorrection = abs(MCRZoomPI - (steps + MCRZoomStep))
 
-        success = MCRMove(constMCRZoomMotor, steps + MCRZoomPISide * blCorrection, constMCRFZDefaultSpeed)
-        success = MCRMove(constMCRZoomMotor, -MCRZoomPISide * blCorrection, constMCRFZDefaultSpeed)
+        success = MCRMove(constMCRZoomMotor, steps + MCRZoomPISide * blCorrection, speed)
+        success = MCRMove(constMCRZoomMotor, -MCRZoomPISide * blCorrection, speed)
     else:
         # no need for backlash adjustment
-        success = MCRMove(constMCRZoomMotor, steps, constMCRFZDefaultSpeed)
+        success = MCRMove(constMCRZoomMotor, steps, speed)
 
     MCRZoomStep = MCRZoomStep + steps
     if not success:
@@ -462,9 +464,9 @@ def irisHome():
 # input: steps to move
 # global: set MCRIrisStep
 # return: final step
-def irisRel(steps):
+def irisRel(steps:int, speed:int=constMCRIrisDefaultSpeed) -> int:
     global MCRIrisStep
-    MCRMove(constMCRIrisMotor, steps, constMCRIrisDefaultSpeed)
+    MCRMove(constMCRIrisMotor, steps, speed)
 
     # set position tracking
     MCRIrisStep += steps
@@ -475,10 +477,11 @@ def irisRel(steps):
 # irisAbs
 # more iris to absolute position
 # input: steps
+#       speed
 # return: final step
-def irisAbs(steps):
+def irisAbs(steps:int, speed:int=constMCRIrisDefaultSpeed) -> int:
     irisHome()
-    finalStep = irisRel(steps)
+    finalStep = irisRel(steps, speed)
     return finalStep
 
 # IRCInit
