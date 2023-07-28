@@ -1,2 +1,4 @@
 __pycache__
 Archive
+.gitignore
+MCRcontrol_simulation.py
