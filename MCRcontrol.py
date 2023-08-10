@@ -58,7 +58,7 @@ MCRZoomAcceleration = 0
 #           tracePrintMCR for debugging
 # return: success integer value (comport > 0 == True)
 #           err_serial_port: serial port not available
-def MCRInit(com:str, tracePrint:bool=False):
+def MCRInit(com:str, tracePrint:bool=False) -> bool:
     success = 0
     global serialPort, tracePrintMCR, MCRZoomRespectLimit, MCRFocusRespectLimit
     tracePrintMCR = tracePrint
