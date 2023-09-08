@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "TheiaMCR"
+version = "1.0.8"
+authors = [
+  { name="Mark Peterson", email="mpeterson@theiatech.com" },
+]
+description = "Theia MCR motor control functions"
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+  'Development Status :: 5 - Production/Stable',
+  'Intended Audience :: Science/Research',
+  'Intended Audience :: Manufacturing',
+  'License :: OSI Approved :: BSD License',  
+  'Operating System :: Microsoft :: Windows',
+  'Programming Language :: Python :: 3',
+  'Natural Language :: English',
+]
+dependencies = ["pyserial"]
+
+[project.urls]
+"Homepage" = "https://github.com/cliquot22/TheiaMCR"
+"Bug Tracker" = "https://github.com/cliquot22/TheiaMCR/issues"
+
+[tool.setuptools]
+packages = ["TheiaMCR"]

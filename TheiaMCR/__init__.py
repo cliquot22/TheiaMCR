@@ -1,1 +1,9 @@
-# https://towardsdatascience.com/building-a-python-package-without-publishing-e2d36c4686cd
+# TheiaMCR module for controling motors using MCR600
+#
+# Theia Technologies
+# https://www.theiatech.com
+# (c) 2023 Theia Technologies
+__author__ = 'Mark Peterson'
+__credits__ = 'Theia Technologies'
+
+from TheiaMCR.MCRcontrol import *
