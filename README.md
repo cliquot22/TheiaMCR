@@ -1,25 +1,36 @@
 # Theia Technologies motor control board interface
-Theia Technologies offers a [MCR600 motor control board](https://www.theiatech.com/lenses/accessories/mcr/) for interfacing with Theia's motorized lenses.  This board controls focus, zoom, iris, and IRC filter motors.  It can be connected to a host comptuer by USB, UART, or I2C connection.  
+Theia Technologies offers a [MCR600 motor control board](https://www.theiatech.com/lenses/accessories/mcr/) for controlling Theia's motorized lenses.  This board controls focus, zoom, iris, and IRC filter motors.  It can be connected to a host comptuer by USB, UART, or I2C connection.  
 
 # Features
-<img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/python/python-original.svg" alt="python" width="40" height="40"/> The MCR600 board has a proprietary command protocol to control and get information from the board.  The protocol is a customized string of up to 12 bytes which can be deciphered in the MCR600 documentation.  However for ease of use, Theia has developed this Python module to format the custom byte strings and send them to the board.  The user can request the focus motor to move 1000 steps for example.  The focusRel function will convert this request to the appropriate byte string and send it over USB connection to the MCR control board.  This will cause the lens motor to move 1000 steps.  
+<img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/python/python-original.svg" alt="python" width="40" height="40"/> The MCR600 board (and MCR400, MCR500 and others in the MCR series) has a proprietary command protocol to control and get information from the board.  The protocol is a customized string of up to 12 bytes which can be deciphered in the MCR600 [documentation](https://www.theiatech.com/lenses/accessories/mcr/).  For ease of use, Theia has developed this Python module to format the custom byte strings and send them to the board.  The user can request the focus motor to move 1000 steps for example.  The focusRel function will convert this request to the appropriate byte string and send it over USB connection to the MCR control board.  This will cause the lens motor to move 1000 steps.  
 
 # Quick start
-This module can be loaded into a Python program.  
+This module can be loaded into a Python program using "pip install TheiaMCR".  
 Theia's motorized lens should be connected to the MCR600 board and the board should be connected to the host computer via USB connection thorugh a virtual com port.  
 
 # Functions
 ## Initialization functions
-- MCRInit: initialize the  board
-- focusInit, zoomInit, irisInit, IRCInit: initialize the appropriate motor (setup)
-- focusHome, zoomHome, irisHome: move the motor to the home position
+- create a MCRControl class instance to initialize the board communications
+- focusInit, zoomInit, irisInit: initialize the motors
+- IRCInit: initialize the IR cut filter motor
 ## Motor movement functions
-- focusAbs, zoomAbs, irisAbs: move the motor to the home position then to an absolute step number
-- focusRel, zoomRel, irisRel: move a relative number of steps
-- IRCState: set the filter switch state (A/B)
-## Information functions
-- readFWRevision: read board firmware revision
-- readBoardSN: read board serial number
+- IRCState: set the filter switch state to 0 or 1 
+(For the following functions "motor" is replaced with "focus", "zoom" or "iris")
+- motor.home: send the motor to the home position and set the current step number
+- motor.moveAbs: move the motor to an absolute step number after sending it to home first
+- motor.moveRel: move by a relative number of steps
+## Information and setting functions
+- MCRBoard.readFWRevision: read board firmware revision
+- MCRBoard.readBoardSN: read board serial number
+- motor.setMotorSpeed: set the motor speed in pulses per second (pps)
+- motor.setRespectLimits: turn on or off the home position limit stops for focus and zoom
+
+# Important variables
+Each motor has these variables available
+- motor.currentStep: current motor step number
+- motor.currentSpeed: current motor speed in pulses per second (pps)
+- motor.maxSteps: maximum number of steps for the full range of movement
+- motor.PIStep: photointerrupber limit switch step position (within the full range of movement).  After sending the motor to home, the current step will be set to this PIStep number.  
 
 # License
 Theia Technologies BSD license
@@ -41,4 +52,4 @@ Mark Peterson at Theia Technologies
 [mpeterson@theiatech.com](mailto://mpeterson@theiatech.com)
 
 # Revision
-v.1.0.8
+v.2.0.0

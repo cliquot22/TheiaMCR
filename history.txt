@@ -17,6 +17,9 @@ Upload the final version: twine upload dist/*
 change to a MCR class
 
 # revision history
+v.2.0.0 10/15/2023 changed to classes (MCRControl, board, motor)
+                removed debug tracePrint
+                created an example use file
     v.1.0.7~8 9/5/2023 modification to upload as a Python package
     v.1.0.6 8/30/2023 modified setup.py for pip uploading
     v.1.0.5 6/26/2023 added speed variable to focusRel, zoomRel, and irisRel

@@ -93,7 +93,7 @@ def printErrorListToLog():
 def decipher(errNum):
     if isinstance(errNum, list):
         errNum = errNum[0]
-
+    
     errorList = {\
         # error codes
         ERR_FUNCTION_EXCEPTION: 'captures exception error in the function', \
