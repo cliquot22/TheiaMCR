@@ -17,6 +17,7 @@ Upload the final version: twine upload --skip-existing dist/*
 change to a MCR class
 
 # revision history
+    v.2.0.3 10/16/2023 exposed MCRInitialized variable
     v.2.0.1~2 10/16/2023 bug in __init.py__ import statement, and TheiaMCR.errList import statement
 v.2.0.0 10/15/2023 changed to classes (MCRControl, board, motor)
                 removed debug tracePrint

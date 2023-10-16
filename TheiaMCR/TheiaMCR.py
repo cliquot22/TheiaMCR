@@ -41,6 +41,7 @@ MCR_BACKLASH_OVERSHOOT = 60                      # used to remove lens backlash,
 
 class MCRControl():
     serialPort = 'com4'
+    MCRInitialized = False
 
     MCRBoard = None         # controller board instance
     focus = None            # motor types
