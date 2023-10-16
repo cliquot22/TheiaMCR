@@ -10,7 +10,7 @@
 
 import serial
 import time
-import errList as err
+import TheiaMCR.errList as err
 import logging as log
 
 # internal constants used across the classes in this module.  

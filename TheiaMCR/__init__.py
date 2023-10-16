@@ -6,4 +6,4 @@
 __author__ = 'Mark Peterson'
 __credits__ = 'Theia Technologies'
 
-from TheiaMCR.MCRcontrol import *
+from TheiaMCR.TheiaMCR import *

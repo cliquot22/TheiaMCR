@@ -10,13 +10,14 @@ Install the latest build: py -m pip install --upgrade build
 Build the distribution files: py -m build
 Upload to the test environment: py -m twine upload --skip-existing --repository testpypi dist/*
 Test install: py -m pip install --index-url https://test.pypi.org/simple/ --no-deps TheiaMCR
-Upload the final version: twine upload dist/* 
+Upload the final version: twine upload --skip-existing dist/* 
 
 # to do
 --Time out if no response from comport (MCR not connected to that com port)
 change to a MCR class
 
 # revision history
+    v.2.0.1~2 10/16/2023 bug in __init.py__ import statement, and TheiaMCR.errList import statement
 v.2.0.0 10/15/2023 changed to classes (MCRControl, board, motor)
                 removed debug tracePrint
                 created an example use file
