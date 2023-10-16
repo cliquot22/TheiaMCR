@@ -87,17 +87,14 @@ class MCRControl():
     #                           this variable is supported in firmware)
     # return: True if motor initialization was successful
     def focusInit(self, steps:int, pi:int, move:bool=True, accel:int=0) -> bool:
-        log.info('Create focus motor instance')
         self.focus = self.motor(MCR_FOCUS_MOTOR_ID, steps, pi, move, accel)
         return self.focus.initialized
     
     def zoomInit(self, steps:int, pi:int, move:bool=True, accel:int=0) -> bool:
-        log.info('Create zoom motor instance')
         self.zoom = self.motor(MCR_ZOOM_MOTOR_ID, steps, pi, move, accel)
         return self.zoom.initialized
     
     def irisInit(self, steps:int, move:bool=True) -> bool:
-        log.info('Create iris motor instance')
         self.iris = self.motor(MCR_IRIS_MOTOR_ID, steps, 0, move, 0)
         return self.iris.initialized
 
@@ -108,7 +105,6 @@ class MCRControl():
     # control docuemtation for more info.  
     # return: success (always True)
     def IRCInit(self) -> bool:
-        log.info('Create IRC motor')
         _err = self.motor(MCR_IRC_MOTOR_ID, steps=1000, pi=0, DCMotorType=True, move=False)
         return True
 
@@ -216,8 +212,7 @@ class MCRControl():
         #           err_bad_move: PI was nto set (call motorInit first) |
         #           err_bad_move: no PI was triggered
         #         ]
-        def home(self) -> int:
-            log.info(f'Motor 0x{self.motorID:02X} home')            
+        def home(self) -> int:          
             # determine direction of PI
             steps = (self.maxSteps * 1.1) * self.PISide
 
