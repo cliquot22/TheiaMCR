@@ -14,7 +14,6 @@ Upload the final version: twine upload --skip-existing dist/*
 
 # to do
 --Time out if no response from comport (MCR not connected to that com port)
-change to a MCR class
 
 # revision history
     v.2.0.4 10/16/2023 removed some extra log.info lines that were not useful in production
