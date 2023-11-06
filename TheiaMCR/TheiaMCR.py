@@ -56,21 +56,23 @@ class MCRControl():
     #           The com port name is formatted for Windows.  
     # globals: set MCRInitialized value
     def __init__(self, com:str):
-        # initialize board
         success = 0
-        try:
-            self.serialPort = serial.Serial(port = com, baudrate=115200, bytesize=8, timeout=0.1, stopbits=serial.STOPBITS_ONE)
-            success = int(com[3:])
-            log.debug(f'Comport {success} communication success')
-        except serial.SerialException as e:
-            log.error("Serial port not open {}".format(e))
-            err.saveError(err.ERR_SERIAL_PORT, err.MOD_MCR, err.errLine())
-            success = err.ERR_SERIAL_PORT
+        if self.MCRInitialized:
+            success = 1
+        else:
+            # initialize board
+            try:
+                self.serialPort = serial.Serial(port = com, baudrate=115200, bytesize=8, timeout=0.1, stopbits=serial.STOPBITS_ONE)
+                success = int(com[3:])
+                log.debug(f'Comport {success} communication success')
+            except serial.SerialException as e:
+                log.error("Serial port not open {}".format(e))
+                err.saveError(err.ERR_SERIAL_PORT, err.MOD_MCR, err.errLine())
+                success = err.ERR_SERIAL_PORT
 
-        # send a test command to the board to read FW version
-        self.board.serialPort = self.serialPort
-        self.MCRBoard = self.board()
-        response = ""
+            # send a test command to the board to read FW version
+            self.board.serialPort = self.serialPort
+            self.MCRBoard = self.board()
         response = self.MCRBoard.readFWRevision()
         if len(response) == 0:
             log.error("Error: No resonse received from MCR controller")
