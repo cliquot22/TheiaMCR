@@ -248,8 +248,7 @@ class MCRControl():
         #         ]
         def moveAbs(self, step:int) -> int:
             if step < 0:
-                log.error("Error: focus cannot move abs < 0")
-                return err.ERR_RANGE
+                log.warning("Warning: target motor step < 0")
 
             # move to PI position
             error = self.home()

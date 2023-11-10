@@ -18,7 +18,7 @@ Theia's motorized lens should be connected to the MCR600 board and the board sho
 - IRCState: set the filter switch state to 0 or 1 
 (For the following functions "motor" is replaced with "focus", "zoom" or "iris")
 - motor.home: send the motor to the home position and set the current step number
-- motor.moveAbs: move the motor to an absolute step number after sending it to home first
+- motor.moveAbs: move the motor to an absolute step number after sending it to home first.  Moving to absolute step < 0 is possible if setRespectLimits(False).  
 - motor.moveRel: move by a relative number of steps
 ## Information and setting functions
 - MCRBoard.readFWRevision: read board firmware revision
@@ -43,4 +43,4 @@ Mark Peterson at Theia Technologies
 [mpeterson@theiatech.com](mailto://mpeterson@theiatech.com)
 
 # Revision
-v.2.0.5
+v.2.0.6
