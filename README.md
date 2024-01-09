@@ -8,21 +8,27 @@
 This module can be loaded into a Python program using pip.  
 `pip install TheiaMCR`   
 Theia's motorized lens should be connected to the MCR600 board and the board should be connected to the host computer via USB connection thorugh a virtual com port.  The class must be initizlized first using the `__init__()` function.   
-```# create the motor control board instance
-MCR = mcr.MCRControl(comport)``` 
+``` 
+# create the motor control board instance
+MCR = mcr.MCRControl(comport)
+``` 
 
 Then the motors must all be initialized with their steps and limit positions.  
-```# initialize the motors (Theia TL1250P N6 lens in this case)
+``` 
+# initialize the motors (Theia TL1250P N6 lens in this case)
 MCR.focusInit(8390, 7959)
 MCR.zoomInit(3227, 3119)
 MCR.irisInit(75)
-MCR.IRCInit()```  
+MCR.IRCInit()
+```  
 The initialization commands will create instances of the motor class for each motor which can be accessed by focus, zoom, and iris named instances.  There are some board query commands that use the MCRBoard subclass.  This subclass was automatically initilized.  
 
 Now the motors can be controlled individually.  For example, the focus motor can be moved to an absolute step number.  
-```# move the focus motor
+``` 
+# move the focus motor
 MCR.focus.moveAbs(6000)
-log.info(f'Focus step {MCR.focus.currentStep}')``` 
+log.info(f'Focus step {MCR.focus.currentStep}')
+``` 
 
 # Important variables
 Each motor has these variables available
