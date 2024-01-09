@@ -19,31 +19,46 @@ ERR_MOVE_TIMEOUT = -32              # no response before timeout
 MOD_MCR = 8                         # MCRControl
 
 # save the error in global variables
-# global: finalError
-# input: errNum: error number
-#       modNum: module number that generated the error
-#       lineNum: line in the module
 def saveError(errNum:int, modNum:int, lineNum:int):
+    '''
+    Save the error in global variable
+    ### global: 
+    - set finalError
+    ### input: 
+    - errNum: error number
+    - modNum: module number that generated the error
+    - lineNum: line in the module
+    '''
     global finalError
     log.error(f'ERROR: {errNum} {decipher(errNum)} in module {module(modNum)}, ln {lineNum}')
     finalError.append([errNum, modNum, lineNum])
 
 # clear the error list
-# global: finalError
 def clearErrorList():
+    ''' Clear the error list
+    ### global:
+    - clear finalError
+    '''
     global finalError
     finalError = []
 
 # print the error list to the active log
 def printErrorListToLog():
+    ''' 
+    Print the error list in the console from the global finalError
+    '''
     for error in finalError:
         log.error(f'  {error[0]} {decipher(error[0])}, module {module(error[1])}, line {error[2]}')
     
 # decipher
-# decipher error number
-# input: error number or formatted error code list type
-# return: user readable string
 def decipher(errNum):
+    '''
+    Decipher the error number. 
+    ### input: 
+    - error number or formatted error code list type
+    ### return: 
+    [user readable string]
+    '''
     if isinstance(errNum, list):
         errNum = errNum[0]
     
@@ -60,9 +75,14 @@ def decipher(errNum):
 
 
 # decipher module generating error code
-# input: module number constant or error code list type
-# return: module name string
 def module(modNum):
+    '''
+    (Internal function) Decipher module generating error code.  
+    ### input: 
+    - module number constant or error code list type
+    ### return: 
+    [module name string]
+    '''
     if isinstance(modNum, list):
         modNum = modNum[1]
     modList = { 
@@ -72,6 +92,11 @@ def module(modNum):
 
 # get line number from the code when generating an error code
 def errLine():
+    '''
+    Get the line number from the code when the error is generated
+    ### return
+    [code line number]
+    '''
     global finalErrorLine
     cf = currentframe()
     finalErrorLine = cf.f_back.f_lineno

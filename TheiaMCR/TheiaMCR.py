@@ -27,18 +27,6 @@ MCR_BACKLASH_OVERSHOOT = 60                      # used to remove lens backlash,
 
 #####################################################################################
 # MCRControl class
-# This is the top level class for all interactions with the MCR600 series boards
-# Public functions: 
-#   __init__(self, com:str)
-#   focusInit(self, steps:int, pi:int, move:bool=True, accel:int=0) -> bool
-#   zoomInit(self, steps:int, pi:int, move:bool=True, accel:int=0) -> bool
-#   irisInit(self, steps:int, move:bool=True) -> bool
-#   IRCInit(self) -> bool
-#   IRCState(self, state:bool) -> int
-# Private classes: 
-#   motor
-#   board
-
 class MCRControl():
     serialPort = 'com4'
     MCRInitialized = False
@@ -49,13 +37,32 @@ class MCRControl():
     iris = None
     
     # MCRInit
-    # initialize the MCR board before any commands can be sent.  
-    # Motor initialization must be called separately for each motor. 
-    # Successful initialization is confirmed by receiving the board firmware version from the board.  
-    # input: com: the com port name of the board (e.g. "com21")
-    #           The com port name is formatted for Windows.  
-    # globals: set MCRInitialized value
     def __init__(self, com:str):
+        '''
+        This class is used for interacting with the Theia MCR motor control boards. 
+        Initialize the MCR board (this class) before any commands can be sent.  
+        Successful initialization is confirmed by receiving the board firmware version from the board.  
+        Motor initialization (focusInit, zoomInit, irisInit) must be called separately for each motor. 
+
+        This is the top level class for all interactions with the MCR600 series boards
+        ### input: 
+        - com: the com port name of the board (e.g. "com21").  The com port name is formatted for Windows.  
+        ### Public functions: 
+        - __init__(self, com:str)
+        - focusInit(self, steps:int, pi:int, move:bool=True, accel:int=0) -> bool
+        - zoomInit(self, steps:int, pi:int, move:bool=True, accel:int=0) -> bool
+        - irisInit(self, steps:int, move:bool=True) -> bool
+        - IRCInit(self) -> bool
+        - IRCState(self, state:bool) -> int
+        ### class variables
+        - MCRInitialized: set when the board is successfully initialized (not the motors)
+        ### Sub-classes: 
+        - motor
+        - board
+
+        (c)2023 Theia Technologies
+        www.TheiaTech.com
+        '''
         success = 0
         if self.MCRInitialized:
             success = 1
@@ -81,45 +88,69 @@ class MCRControl():
         self.MCRInitialized = True if success >= 0 else False
 
     # Motor initialization
-    # Initialize the parameters of the motor.  This must be called after the board is initialized.  
-    # input: steps: maximum number of steps
-    #       pi: pi location in step number
-    #       move: (optional, True) move motor to home position or (False) initialize without moving. 
-    #       accel: (optional, 0) motor acceleration steps (check motor control documentation to see if 
-    #                           this variable is supported in firmware)
-    # return: True if motor initialization was successful
     def focusInit(self, steps:int, pi:int, move:bool=True, accel:int=0) -> bool:
+        '''
+        Initialize the parameters of the motor.  This must be called after the board is initialized.  
+        ### input: 
+        - steps: maximum number of steps
+        - pi: pi location in step number
+        - move: (optional, True) move motor to home position or (False) initialize without moving. 
+        - accel: (optional, 0) motor acceleration steps (check motor control documentation to see if this variable is supported in firmware)
+        ### return: 
+        [True] if motor initialization was successful
+        '''
         self.focus = self.motor(MCR_FOCUS_MOTOR_ID, steps, pi, move, accel)
         return self.focus.initialized
     
     def zoomInit(self, steps:int, pi:int, move:bool=True, accel:int=0) -> bool:
+        '''
+        Initialize the parameters of the motor.  This must be called after the board is initialized.  
+        ### input: 
+        - steps: maximum number of steps
+        - pi: pi location in step number
+        - move: (optional, True) move motor to home position or (False) initialize without moving. 
+        - accel: (optional, 0) motor acceleration steps (check motor control documentation to see if this variable is supported in firmware)
+        ### return: 
+        [True] if motor initialization was successful
+        '''
         self.zoom = self.motor(MCR_ZOOM_MOTOR_ID, steps, pi, move, accel)
         return self.zoom.initialized
     
     def irisInit(self, steps:int, move:bool=True) -> bool:
+        '''
+        Initialize the parameters of the motor.  This must be called after the board is initialized.  
+        ### input: 
+        - steps: maximum number of steps
+        - move: (optional, True) move motor to home position or (False) initialize without moving. 
+        ### return: 
+        [True] if motor initialization was successful
+        '''
         self.iris = self.motor(MCR_IRIS_MOTOR_ID, steps, 0, move, 0)
         return self.iris.initialized
 
     # IRCInit
-    # initialize the parameters of the IRC motor.  
-    # for DC motor: maximum 1000 steps allows 1 second activation time (at speed 1000pps).  The activation
-    # time is set by the number of steps (1 step = 1 ms).  See the motor
-    # control docuemtation for more info.  
-    # return: success (always True)
     def IRCInit(self) -> bool:
+        '''
+        Initialize the parameters of the IRC motor.  
+        For the IRC switch motor: maximum 1000 steps allows 1 second activation time (at speed 1000pps).  The activation
+        time is set by the number of steps (1 step = 1 ms).  See the motor control docuemtation for more info.  
+        ### return: 
+        [True]
+        '''
         _err = self.motor(MCR_IRC_MOTOR_ID, steps=1000, pi=0, DCMotorType=True, move=False)
         return True
 
     # IRCState
-    # set the IRC state to visible or clear filter (or other options depending on the lens model)
-    # for DC motor: 1000pps speed makes the step count (MCR_IRC_SWITCH_TIME) in ms
-    # input: state: [
-    #               0: clear filter 
-    #               1: visible (IR blocking) filter
-    #               ]
-    # return: 0
-    # return: 0
     def IRCState(self, state:bool) -> int:
+        '''
+        Set the IRC state to either visible or clear filter (or other options depending on the lens model)
+        ### input: state: [
+        - 0: clear filter 
+        - 1: visible (IR blocking) filter
+        ]
+        ### return: 
+        [0]
+        '''
         sw = MCR_IRC_SWITCH_TIME  ## move in positive direction
         if state == 0:
             sw *= -1                ## move in negative direction
@@ -128,16 +159,6 @@ class MCRControl():
 
     ######################################################################################################
     # Motor definition class
-    # The class is used for the focus, zoom, and iris motors.  The only difference are speeds and number of steps.  
-    # Public functions: 
-    #   __init__(self, motorID:bytes, steps:int, pi:int, move:bool=True, accel:int=0, DCMotorType:bool=False)
-    #   home(self) -> int
-    #   moveAbs(self, step:int) -> int
-    #   moveRel(self, steps:int, correctForBL:bool=True) -> int
-    #   setMotorSpeed(self, speed) -> int
-    #   setRespectLimits(self, state:bool)
-    # Private functions:
-    #   checkLimits(self, steps:int, limitStep:bool=False) -> int
     class motor():
         motorID = 0x00              # motor ID (0x01 ~ 0x04) for controller, see the motor controller documentation.  
         initialized = False
@@ -154,18 +175,38 @@ class MCRControl():
         MCRBoard = None
 
         # initialize the parameters of the motor
-        # input: motorID: byte value for the motor (0x01 ~ 0x04).  See the motor control documentation.  
-        #                   # 0x01: focus
-        #                   # 0x02: zoom
-        #                   # 0x03: iris
-        #                   # 0x04: IRC (DC motor)
-        #       steps: maximum number of steps
-        #       pi: pi location in step number
-        #       move: (optional, True) move motor to home position after initializing
-        #       accel: (optional, 0) motor acceleration steps.  Check the documentation to see if acceleration is 
-        #                   supported in the firmware.  
-        #       DCMotorType (optional: False): set True if the motor is DC motor type otherwise (False) is it a stepper
         def __init__(self, motorID:bytes, steps:int, pi:int, move:bool=True, accel:int=0, DCMotorType:bool=False):
+            '''
+            The class is used for the focus, zoom, and iris motors.  The only difference between these motors are speeds and number of steps.  
+            ### Public functions: 
+            - __init__(self, motorID:bytes, steps:int, pi:int, move:bool=True, accel:int=0, DCMotorType:bool=False)
+            - home(self) -> int
+            - moveAbs(self, step:int) -> int
+            - moveRel(self, steps:int, correctForBL:bool=True) -> int
+            - setMotorSpeed(self, speed) -> int
+            - setRespectLimits(self, state:bool)
+            ### input: 
+            - motorID: byte value for the motor (0x01 ~ 0x04).  See the motor control documentation.  
+                - 0x01: focus
+                - 0x02: zoom
+                - 0x03: iris
+                - 0x04: IRC (DC motor)
+            - steps: maximum number of steps
+            - pi: pi location in step number
+            - move: (optional, True) move motor to home position after initializing
+            - accel: (optional, 0) motor acceleration steps.  Check the documentation to see if acceleration is supported in the firmware.  
+            - DCMotorType (optional: False): set True if the motor is DC motor type otherwise (False) is it a stepper
+            ### class variables
+            - initialized
+            - currentStep
+            - currentSpeed
+            - PIStep (step position of the photo interrupter limit switch)
+            - maxSteps
+            - respectLimits (set True to prevent motor from exceeding limits)
+            - MCRBoard (the control board instance)
+            ### Private functions:
+            - checkLimits(self, steps:int, limitStep:bool=False) -> int
+            '''
             self.motorID = motorID
             self.PIStep = pi
             self.maxSteps = steps
@@ -204,17 +245,22 @@ class MCRControl():
                     err.saveError(error, err.MOD_MCR, err.errLine())
 
         # Home
-        # send the motor to the PI location by moving 110% of the maximum number of steps.  The motor
-        # will automatically and instantly stop at the PI locaiton.  The respectLimits variable will be reset
-        # to the original value after doing the home movement.  
-        # globals: set currentStep
-        #       read currentSpeed
-        # return: [
-        #           OK |
-        #           err_bad_move: PI was nto set (call motorInit first) |
-        #           err_bad_move: no PI was triggered
-        #         ]
-        def home(self) -> int:          
+        def home(self) -> int:
+            '''
+            Send the motor to the PI location by moving 110% of the maximum number of steps.  The motor
+            will automatically and instantly stop at the PI locaiton.  The respectLimits variable will be reset
+            to the original value after doing the home movement.  
+            ### input:
+            - none
+            ### globals: 
+            - set currentStep
+            - read currentSpeed
+            ### return: 
+            [
+                OK | 
+                err_bad_move: (PI was nto set or triggered (call motorInit first))
+            ]
+            '''
             # determine direction of PI
             steps = (self.maxSteps * 1.1) * self.PISide
 
@@ -237,16 +283,19 @@ class MCRControl():
             return OK
         
         # moveAbs
-        # move the motor to the home position then to the absolute step number.  The step must be an integer
-        # step number and can not be outside the PI position (i.e. can't be 8000 if the PI position is 7800)
-        # input: step: the final target step to move to
-        #               NOTE: backlash is compensated for becuase the abs move will always move away from the PI position. 
-        # return: [
-        #           OK |
-        #           err_bad_move: if there is a home error |
-        #           err_param: if there is an input error
-        #         ]
         def moveAbs(self, step:int) -> int:
+            '''
+            Move the motor to the home position then to the absolute step number.  The step must be an integer
+            step number and can not be outside the PI position (i.e. can't be 8000 if the PI position is 7800)
+            ### input: 
+            - step: the final target step to move to (NOTE: backlash is compensated for becuase the abs move will always move away from the PI position. )
+            ### return: 
+            [
+                OK | 
+                err_bad_move: if there is a home error | 
+                err_param: if there is an input error
+            ]
+            '''
             if step < 0:
                 log.warning("Warning: target motor step < 0")
 
@@ -267,18 +316,21 @@ class MCRControl():
             return OK
         
         # moveRel
-        # move the motor by a number of steps.  This can be positive or negative movement.  
-        # By default this will compensate for backlash in the motor when moving towards the PI limit position.  
-        # Steps won't exceed the motor limits but PI trigger will stop the motor.  If the steps go beyond the 
-        # hard stop, the step counter will be off and the motor will have to be home initialized.  
-        # input: steps: the number of steps to move
-        #       correctForBL (optional, True): set true to compensate for backlash when moving away from PI limit switch.  
-        # global: read currentSpeed, acceleration
-        # return: [
-        #           OK |
-        #           err_bad_move: if there is a move error 
-        #         ]
         def moveRel(self, steps:int, correctForBL:bool=True) -> int:
+            '''
+            Move the motor by a number of steps.  This can be positive or negative movement.  
+            By default this will compensate for backlash in the motor when moving towards the PI limit position.  
+            Steps won't exceed the motor limits but PI trigger will stop the motor.  If the steps go beyond the 
+            hard stop, the step counter will be off and the motor will have to be home initialized.  
+            ### input: 
+            - steps: the number of steps to move
+            - correctForBL (optional, True): set true to compensate for backlash when moving away from PI limit switch.  
+            ### return: 
+            [
+                OK |
+                err_bad_move: if there is a move error 
+            ]
+            '''
             if steps == 0:
                 return OK
 
@@ -308,24 +360,33 @@ class MCRControl():
             return OK
         
         # setRespectLimits
-        # set the flag to stop motor moves at the PI limits or to continue past the limits.  In some cases
-        # the limits should be turned off to get to the target motor position.  
-        # input: state: set or remove the limit
-        # globals: set the respectLimits variable.  
         def setRespectLimits(self, state:bool):
+            '''
+            Set the flag to stop motor moves at the PI limits or to continue past the limits.  In some cases
+            the limits should be turned off to get to the target motor position.  
+            ### input: 
+            - state: set or remove the limit
+            ### globals: 
+            - set the respectLimits class variable.  
+            '''
             log.info(f'PI limit for motor 0x{self.motorID:02X} set to {state}')
             self.respectLimits = state
             self.MCRBoard.MCRRegardLimits(self.motorID, state, self.PISide)
 
         # setMotorSpeed
-        # Set the motor speed.  It should be in the range.  
-        # input: speed: speed to set [pps]
-        # globals: set currentSpeed
-        # return: [
-        #           OK |
-        #           range error, out of acceptable range 
-        #         ]
         def setMotorSpeed(self, speed) -> int:
+            '''
+            Set the motor speed.  It should be in the range.  
+            ### input: 
+            - speed: speed to set [pps]
+            ### globals: 
+            - set currentSpeed
+            ### return: 
+            [
+                OK |
+                err_range, out of acceptable range 
+            ]
+            '''
             if self.motorID in {MCR_FOCUS_MOTOR_ID, MCR_ZOOM_MOTOR_ID}:
                 if speed > 1500 or speed < 100:
                     log.warning(f'Requested speed {speed} is outside range 100-1500')
@@ -339,20 +400,24 @@ class MCRControl():
 
         #-----internal functions------------------------------
         # checkLimits
-        # check if the target step will exceed limits or hard stop positions.  
-        # if limitStep is True the requested step number will be changed so it doesn't exceed
-        # the PI limit switch or hard stop positions.  If it is set to False, there will only be a 
-        # warning but the number of steps won't be changed.  
-        # input: steps: target steps
-        #       limitStep: (optional, False) set True to limit steps, False to only warn
-        # return: retVal [
-        #           2: steps exceed maximum steps  |
-        #           1: steps exceed high PI  |
-        #           0: steps will not cause exceeding limits |
-        #           -1: steps exceed low PI  |
-        #           -2: steps exceed minimum steps
-        #           ]
         def checkLimits(self, steps:int, limitStep:bool=False) -> int:
+            '''
+            Check if the target step will exceed limits or hard stop positions.  
+            if limitStep is True the requested step number will be changed so it doesn't exceed
+            the PI limit switch or hard stop positions.  If it is set to False, there will only be a 
+            warning but the number of steps won't be changed.  
+            ### input: 
+            - steps: target steps
+            - limitStep: (optional, False) set True to limit steps, False to only warn
+            ### return: 
+            [
+                2: steps exceed maximum steps  |
+                1: steps exceed high PI  |
+                0: steps will not cause exceeding limits |
+                -1: steps exceed low PI  |
+                -2: steps exceed minimum steps
+            ]
+            '''
             retSteps = steps
             retVal = 0
             if limitStep and (self.PISide > 0) and (self.currentStep + steps > self.PIStep):
@@ -379,31 +444,41 @@ class MCRControl():
 
     ###################################################################################################
     # Controller board functions
-    # This class formats the user commands into byte string commands for the MCR600 series board protocol.  
-    # The controller board class variable 'serialPort' must be set before any functions are available. 
-    # The serial port name is formatted as a Windows vitual com port ("com4")
-    # Public functions: 
-    #   __init__(self)
-    #   readFWRevision(self) -> str
-    #   readBoardSN(self) -> str
-    # Private functions: 
-    #   MCRMotorInit(self, id:int, steps:int, pi:int, speedRange:int, DCMotorType:bool=False) -> bool
-    #   MCRMove(self, id:int, steps:int, speed:int, acceleration:int=0) -> bool
-    #   MCRRegardLimits(self, id:int, state:bool=True, PISide:int=1) -> bool
-    #   MCRSendCmd(self, cmd, waitTime:int=10)
     class board():
         serialPort = 'com4'
 
         # initialize the control board 
         # NOTE: the serialPort variable must be set before using any functions. 
         def __init__(self):
+            '''
+            This class formats the user commands into byte string commands for the MCR600 series board protocol.  
+            The controller board class variable 'serialPort' must be set before any functions are available. 
+            The serial port name is formatted as a Windows vitual com port ("com4")
+            ### Public functions: 
+            - __init__(self)
+            - readFWRevision(self) -> str
+            - readBoardSN(self) -> str
+            ### input
+            - none
+            ### class variables
+            - none
+            ### Private functions: 
+            - MCRMotorInit(self, id:int, steps:int, pi:int, speedRange:int, DCMotorType:bool=False) -> bool
+            - MCRMove(self, id:int, steps:int, speed:int, acceleration:int=0) -> bool
+            - MCRRegardLimits(self, id:int, state:bool=True, PISide:int=1) -> bool
+            - MCRSendCmd(self, cmd, waitTime:int=10)
+            '''
             pass
 
         # ----------- board information --------------------
-        # get FW revision on the board
-        # replies with string value of the firmware revision response
-        # return: string representing the FW revision (ex. '5.3.1.0.0')
+        # get the FW revision from the board
         def readFWRevision(self) -> str:
+            '''
+            Get FW revision on the board. 
+            Replies with string value of the firmware revision response
+            ### return: 
+            [string representing the FW revision (ex. '5.3.1.0.0')]
+            '''
             response = ""
             cmd = bytearray(2)
             cmd[0] = 0x76
@@ -420,10 +495,14 @@ class MCRControl():
             return fw
 
         # get the board SN
-        # replies with a string representing the board serial number read from the response
-        # board response is hex digits interpreted (not converted) as decimal in a very specific format (ex. '055-001234')
-        # return: string with serial number
         def readBoardSN(self) -> str:
+            '''
+            Get the serial number of the board. 
+            Replies with a string representing the board serial number read from the response
+            board response is hex digits interpreted (not converted) as decimal in a very specific format (ex. '055-001234')
+            ### return: 
+            [string with serial number]
+            '''
             response = ""
             cmd = bytearray(2)
             cmd[0] = 0x79
@@ -443,18 +522,22 @@ class MCRControl():
 
         #------internal commands---------------------------------------------------------------------------------
         # MCRMotorInit
-        # initialize steps and speeds.  No motor movement is done.  See the motor control specification document
-        # for more information.  
-        # byte array: 
-        #   setup cmd, motor ID, motor type, left stop, right stop, steps (2), min speed (2), max speed (2), CR
-        # input: id: motor ID
-        #       steps: max number of steps
-        #       pi: pi step number
-        #       speedRange: 0: slow speed range 10-200 pps (iris)
-        #                   1: fast speed range 100-1500 pps (focus/zoom)
-        #       DCMotorType (optional: False): set if the motor is a DC motor otherwise (False) it is a stepper
-        # return: success
         def MCRMotorInit(self, id:int, steps:int, pi:int, speedRange:int, DCMotorType:bool=False) -> bool:
+            '''
+            Initialize motor. 
+            Initialize steps and speeds.  No motor movement is done.  See the motor control specification document
+            for more information.  
+            Initialization byte array: 
+            [setup cmd, motor ID, motor type, left stop, right stop, steps (2), min speed (2), max speed (2), CR]
+            ### input: 
+            - id: motor ID
+            - steps: max number of steps
+            - pi: pi step number
+            - speedRange: 0: slow speed range 10-200 pps (iris) | 1: fast speed range 100-1500 pps (focus/zoom)
+            - DCMotorType (optional: False): set if the motor is a DC motor otherwise (False) it is a stepper
+            ### return: 
+            [success]
+            '''
             steps = int(steps)
             pi = int(pi)
 
@@ -507,17 +590,21 @@ class MCRControl():
             return success
         
         # MCRMove
-        # move the motor by a number of steps
-        # NOTE: Iris step direction for MCR is reversed (0x66(+) is iris closed) so invert step direction before moving
-        # byte array: 
-        #   move cmd, motor ID, steps (2), start, speed (2), CR
-        # input: id: motor id (focus/zoom/iris/IRC)
-        #       steps: number of steps to move
-        #       speed: (pps) motor speed
-        #       acceleration (optional: 0): motor start/stop acceleration steps
-        #                   See the motor control documentation to see if this acceleration is supported in the firmware
-        # return: success
         def MCRMove(self, id:int, steps:int, speed:int, acceleration:int=0) -> bool:
+            '''
+            Send the move command byte string. 
+            Move the motor by a number of steps
+            (NOTE: Iris step direction for MCR is reversed (0x66(+) is iris closed) so invert step direction before moving)
+            Command byte array: 
+            [move cmd, motor ID, steps (2), start, speed (2), CR]
+            ### input: 
+            - id: motor id (focus/zoom/iris/IRC)
+            - steps: number of steps to move
+            - speed: (pps) motor speed
+            - acceleration (optional: 0): motor start/stop acceleration steps (See the motor control documentation to see if this acceleration is supported in the firmware)
+            ### return: 
+            [success]
+            '''
             steps = int(steps)
             speed = int(speed)
 
@@ -567,15 +654,20 @@ class MCRControl():
             return success
 
         # MCRRegardLimits
-        # set the focus and zoom limit switches to true/false.  If they are set the motor will not drive
-        # passed the limit however there may be some cases where the motor must go past the limit to reach 
-        # the desired point.  The limit switch should be turned off but beware of backlash when driving past 
-        # the limit switch.  
-        # input: id: motor id (focus/zoom)
-        #       state (optional: True): set limits
-        #       PISide (optional: high): low (-1) or high (1) side PI step
-        # return: true if MCR returned a valid response
         def MCRRegardLimits(self, id:int, state:bool=True, PISide:int=1) -> bool:
+            '''
+            Set the regard limits flag in the board software.  
+            Set the focus and zoom limit switches to true/false.  If they are set the motor will not drive
+            passed the limit however there may be some cases where the motor must go past the limit to reach 
+            the desired point.  The limit switch should be turned off but beware of backlash when driving past 
+            the limit switch.  
+            ### input: 
+            - id: motor id (focus/zoom)
+            - state (optional: True): set limits
+            - PISide (optional: high): low (-1) or high (1) side PI step
+            ### return: 
+            [True] if MCR returned a valid response
+            '''
             if (id != MCR_FOCUS_MOTOR_ID) and (id != MCR_ZOOM_MOTOR_ID):
                 log.error('Motor has no limit switch')
                 return False
@@ -614,11 +706,16 @@ class MCRControl():
             return True
 
         # MCRSendCmd
-        # send the byte string to the MCR600 series board.  
-        # input: cmd: byte string to send
-        #       waitTime: (ms) wait before checking for a response
-        # return: return string from MCR
         def MCRSendCmd(self, cmd, waitTime:int=10):
+            '''
+            Send the command through the com port over USB connection to the board
+            Send the byte string to the MCR600 series board.  
+            ### input: 
+            - cmd: byte string to send
+            - waitTime: (ms) wait before checking for a response
+            ### return: 
+            [return byte string from MCR]
+            '''
             debugCheck = False   # set True to print send/receive byte strings
             # send the string
             if debugCheck: log.debug("   -> {}".format(":".join("{:02x}".format(c) for c in cmd)))
