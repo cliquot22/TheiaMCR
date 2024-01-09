@@ -31,6 +31,8 @@ Each motor has these variables available
 - motor.maxSteps: maximum number of steps for the full range of movement
 - motor.PIStep: photointerrupber limit switch step position (within the full range of movement).  After sending the motor to home, the current step will be set to this PIStep number.  
 
+More information about the available functions can be found in the [wiki](https://github.com/cliquot22/TheiaMCR/wiki) pages.   
+
 # License
 Theia Technologies BSD license
 Copyright 2023 Theia Technologies
