@@ -16,6 +16,9 @@ Upload the final version: twine upload --skip-existing dist/*
 --Time out if no response from comport (MCR not connected to that com port)
 
 # revision history
+v.2.1.0 240122 added communication path control (i2c, UART, USB) to board commands
+                function hint documentation correction for checkLimits return values
+                changed board class name to controllerClass to avoid confusion with MCRboard variable 
     v.2.0.7 240103 function documentation modifications for Python markdown hints 
     v.2.0.6 231110 allowed absolute move to go < 0 in moveAbs
     v.2.0.5 231101 added re-initialization check to __init__

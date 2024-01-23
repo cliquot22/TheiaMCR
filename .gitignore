@@ -3,3 +3,4 @@ __pycache__
 dist
 build
 TheiaMCR.egg-info
+TheiaMCR.test

@@ -7,11 +7,13 @@
 #
 # (c) 2023 Theia Technologies
 # www.TheiaTech.com
+# BSD 3-clause license applies
 
 import serial
 import time
-import TheiaMCR.errList as err
+import errList as err
 import logging as log
+from typing import Tuple
 
 # internal constants used across the classes in this module.  
 RESPONSE_READ_TIME = 500                # (ms) max time for the MCR to post a response in the buffer
@@ -78,8 +80,8 @@ class MCRControl():
                 success = err.ERR_SERIAL_PORT
 
             # send a test command to the board to read FW version
-            self.board.serialPort = self.serialPort
-            self.MCRBoard = self.board()
+            self.controllerClass.serialPort = self.serialPort
+            self.MCRBoard = self.controllerClass()
         response = self.MCRBoard.readFWRevision()
         if len(response) == 0:
             log.error("Error: No resonse received from MCR controller")
@@ -228,7 +230,7 @@ class MCRControl():
                 self.currentSpeed = MCR_IRIS_DEFAULT_SPEED
 
             # initialize the motor control board instance for sending the commands
-            self.MCRBoard = MCRControl.board()
+            self.MCRBoard = MCRControl.controllerClass()
             success = self.MCRBoard.MCRMotorInit(self.motorID, pi=pi, steps=steps, speedRange=speedRange, DCMotorType=DCMotorType)
             if not success:
                 log.error('Motor not initialized')
@@ -411,11 +413,13 @@ class MCRControl():
             - limitStep: (optional, False) set True to limit steps, False to only warn
             ### return: 
             [
-                2: steps exceed maximum steps  |
-                1: steps exceed high PI  |
-                0: steps will not cause exceeding limits |
-                -1: steps exceed low PI  |
-                -2: steps exceed minimum steps
+                return value (
+                    2: steps exceed maximum steps  |
+                    1: steps exceed high PI  |
+                    0: steps will not cause exceeding limits |
+                    -1: steps exceed low PI  |
+                    -2: steps exceed minimum steps),
+                corrected number of steps
             ]
             '''
             retSteps = steps
@@ -444,7 +448,7 @@ class MCRControl():
 
     ###################################################################################################
     # Controller board functions
-    class board():
+    class controllerClass():
         serialPort = 'com4'
 
         # initialize the control board 
@@ -519,6 +523,45 @@ class MCRControl():
                 #sn = ''.join(f'{c:02x}' for c in response)
                 log.info(f"Baord serial number {sn}")
             return sn
+        
+        # communication path
+        def setCommunicationPath(self, path:Tuple[int|str]) -> bool:
+            '''
+            Set the communication path to I2C (0), USB (1), or UART (2).  
+            Once the new path is set, the board will reboot and the existing path will be disabled.  
+            Wait >700ms for reboot before sending additional commands.  
+            See Theia-motor-driver-instructions (available from the website https://theiatech.com/mcr) for more information 
+            about wiring and power for the different paths.  
+            ### input: 
+            - path: new path as integer or string (all caps)
+            ### return: 
+            [success]
+            '''
+            newPath = 1
+            if isinstance(path, str):
+                if path in {'uart', 'UART'}:
+                    newPath = 2
+                elif path in {'i2c', 'I2C'}:
+                    newPath = 0
+                elif path in {'usb', 'USB'}:
+                    newPath = 1
+                else:
+                    log.error(f'New comm path ({path}) not recognized.  Choose I2C, USB, or UART')
+                    return False
+            else:
+                if newPath > 2 or newPath < 0:
+                    log.error('New comm path index out of range (0~2)')
+                    return False
+                newPath = path
+
+            # set the new path
+            cmd = bytearray(3)
+            cmd[0] = 0x6B
+            cmd[1] = newPath
+            cmd[2] = 0x0D
+            self.MCRSendCmd(cmd)
+            log.info(f'New comm path set ({newPath})')
+            return True
 
         #------internal commands---------------------------------------------------------------------------------
         # MCRMotorInit

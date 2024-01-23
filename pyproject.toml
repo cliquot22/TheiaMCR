@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "TheiaMCR"
-version = "2.0.7"
+version = "2.1.0"
 authors = [
   { name="Mark Peterson", email="mpeterson@theiatech.com" },
 ]
@@ -24,7 +24,8 @@ dependencies = ["pyserial"]
 
 [project.urls]
 "Homepage" = "https://github.com/cliquot22/TheiaMCR"
-"Bug Tracker" = "https://github.com/cliquot22/TheiaMCR/issues"
+"Documentation" = "https://github.com/cliquot22/TheiaMCR/wiki"
+"Issues" = "https://github.com/cliquot22/TheiaMCR/issues"
 
 [tool.setuptools]
 packages = ["TheiaMCR"]
