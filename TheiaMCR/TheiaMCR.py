@@ -11,7 +11,7 @@
 
 import serial
 import time
-import errList as err
+import TheiaMCR.errList as err
 import logging as log
 from typing import Tuple
 

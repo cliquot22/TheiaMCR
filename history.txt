@@ -16,6 +16,7 @@ Upload the final version: twine upload --skip-existing dist/*
 --Time out if no response from comport (MCR not connected to that com port)
 
 # revision history
+    v.2.1.1 240123 bug: fixed errList import
 v.2.1.0 240122 added communication path control (i2c, UART, USB) to board commands
                 function hint documentation correction for checkLimits return values
                 changed board class name to controllerClass to avoid confusion with MCRboard variable 
