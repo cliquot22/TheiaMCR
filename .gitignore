@@ -1,5 +1,6 @@
 __pycache__
 .archive
+upload_instructions.txt
 dist
 build
 TheiaMCR.egg-info

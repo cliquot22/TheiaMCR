@@ -83,7 +83,7 @@ class MCRControl():
             self.controllerClass.serialPort = self.serialPort
             self.MCRBoard = self.controllerClass()
         response = self.MCRBoard.readFWRevision()
-        if len(response) == 0:
+        if int(response.rsplit('.', -1)[0]) < 5:
             log.error("Error: No resonse received from MCR controller")
             err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
             success = err.ERR_NO_COMMUNICATION
