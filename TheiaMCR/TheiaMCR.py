@@ -89,6 +89,11 @@ class MCRControl():
             success = err.ERR_NO_COMMUNICATION
         self.MCRInitialized = True if success >= 0 else False
 
+        # added for Mathlab initialization
+        self.focus = None 
+        self.zoom = None
+        self.iris = None
+
     # Motor initialization
     def focusInit(self, steps:int, pi:int, move:bool=True, accel:int=0) -> bool:
         '''

@@ -30,6 +30,17 @@ MCR.focus.moveAbs(6000)
 log.info(f'Focus step {MCR.focus.currentStep}')
 ``` 
 
+## Motor limits
+The parameters for `focusInit()`, `zoomInit()`, and `irisInit` can be found in the lens specification.  These are the parameters for some of Theia's lenses.  
+- TL1250 (-N) lens: 
+    - focusInit(8390, 7959)
+    - zoomInit(3227, 3119)
+    - irisInit(75)
+- TL410 (-R) lens:
+    - focusInit(9353, 8652)
+    - zoomInit(4073, 154)
+    - irisInit(75)
+
 # Important variables
 Each motor has these variables available
 - motor.currentStep: current motor step number
@@ -49,4 +60,4 @@ Mark Peterson at Theia Technologies
 [mpeterson@theiatech.com](mailto://mpeterson@theiatech.com)
 
 # Revision
-v.2.1.6
+v.2.1.7
