@@ -30,6 +30,8 @@ MCR.focus.moveAbs(6000)
 log.info(f'Focus step {MCR.focus.currentStep}')
 ``` 
 
+For the internal IRC switchable filter, the state can be 1 or 2 to match the specification sheet.  Usually filter 1 is visible only transmission and filter 2 is visible + IR transmission.  
+
 ## Motor limits
 The parameters for `focusInit()`, `zoomInit()`, and `irisInit` can be found in the lens specification.  These are the parameters for some of Theia's lenses.  
 - TL1250 (-N) lens: 
@@ -60,4 +62,4 @@ Mark Peterson at Theia Technologies
 [mpeterson@theiatech.com](mailto://mpeterson@theiatech.com)
 
 # Revision
-v.2.1.7
+v.2.1.11

@@ -142,27 +142,28 @@ class MCRControl():
         For the IRC switch motor: maximum 1000 steps allows 1 second activation time (at speed 1000pps).  The activation
         time is set by the number of steps (1 step = 1 ms).  See the motor control docuemtation for more info.  
         ### return: 
-        [True]
+        [initizlized success]
         '''
-        _err = self.motor(MCR_IRC_MOTOR_ID, steps=1000, pi=0, DCMotorType=True, move=False)
-        return True
+        success = self.MCRBoard.MCRMotorInit(MCR_IRC_MOTOR_ID, pi=0, steps=1000, speedRange=1, DCMotorType=True)
+        #####_err = self.motor(MCR_IRC_MOTOR_ID, steps=1000, pi=0, DCMotorType=True, move=False)
+        return success
 
     # IRCState
-    def IRCState(self, state:bool) -> int:
+    def IRCState(self, state:int) -> int:
         '''
         Set the IRC state to either visible or clear filter (or other options depending on the lens model)
-        ### input: state: [
-        - 0: clear filter 
-        - 1: visible (IR blocking) filter
+        ### input: state: [  
+        1: Visible (IR blocking) filter 1 |  
+        2: clear filter 2  
         ]
         ### return: 
-        [0]
+        [new state (1 | 2)]
         '''
         sw = MCR_IRC_SWITCH_TIME  ## move in positive direction
-        if state == 0:
+        if state == 1:
             sw *= -1                ## move in negative direction
         self.MCRBoard.MCRMove(MCR_IRC_MOTOR_ID, steps=sw, speed=1000)
-        return 0
+        return state
 
     ######################################################################################################
     # Motor definition class
@@ -264,7 +265,7 @@ class MCRControl():
             - read currentSpeed
             ### return: 
             [
-                OK | 
+                OK = 0 | 
                 err_bad_move: (PI was nto set or triggered (call motorInit first))
             ]
             '''
@@ -298,7 +299,7 @@ class MCRControl():
             - step: the final target step to move to (NOTE: backlash is compensated for becuase the abs move will always move away from the PI position. )
             ### return: 
             [
-                OK | 
+                OK = 0 | 
                 err_bad_move: if there is a home error | 
                 err_param: if there is an input error
             ]
@@ -334,7 +335,7 @@ class MCRControl():
             - correctForBL (optional, True): set true to compensate for backlash when moving away from PI limit switch.  
             ### return: 
             [
-                OK |
+                OK = 0 |
                 err_bad_move: if there is a move error 
             ]
             '''
@@ -390,7 +391,7 @@ class MCRControl():
             - set currentSpeed
             ### return: 
             [
-                OK |
+                OK = 0 |
                 err_range, out of acceptable range 
             ]
             '''
