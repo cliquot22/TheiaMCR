@@ -13,7 +13,7 @@ import serial
 import time
 import TheiaMCR.errList as err
 import logging as log
-from typing import Tuple
+from typing import Tuple, Union
 
 # internal constants used across the classes in this module.  
 RESPONSE_READ_TIME = 500                # (ms) max time for the MCR to post a response in the buffer
@@ -531,7 +531,7 @@ class MCRControl():
             return sn
         
         # communication path
-        def setCommunicationPath(self, path:Tuple[int|str]) -> bool:
+        def setCommunicationPath(self, path:Union[int|str]) -> bool:
             '''
             Set the communication path to I2C (0), USB (1), or UART (2).  
             Once the new path is set, the board will reboot and the existing path will be disabled.  
