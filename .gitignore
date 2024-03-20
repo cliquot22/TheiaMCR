@@ -1,5 +1,6 @@
 __pycache__
 .archive
+.data
 upload_instructions.txt
 dist
 build

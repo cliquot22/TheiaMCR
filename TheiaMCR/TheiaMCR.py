@@ -24,8 +24,10 @@ MCR_IRIS_MOTOR_ID = 0x03
 MCR_IRC_MOTOR_ID = 0x04
 MCR_IRC_SWITCH_TIME = 50              # (ms) switch time for IRC
 MCR_FZ_DEFAULT_SPEED = 1000           # (pps) default focus/zoom motor speeds
+MCR_FZ_HOME_SPEED = 1200              # (pps) speed to travel to home PI position
 MCR_IRIS_DEFAULT_SPEED = 100          # (pps) default iris motor speed
-MCR_BACKLASH_OVERSHOOT = 60                      # used to remove lens backlash, this should exceed lens maximum backlash amount
+MCR_BACKLASH_OVERSHOOT = 60           # used to remove lens backlash, this should exceed lens maximum backlash amount
+MCR_HARDSTOP_TOLERANCE = 100          # additional move amount to be sure to pass home position from hard stop
 
 #####################################################################################
 # MCRControl class
@@ -255,8 +257,10 @@ class MCRControl():
         # Home
         def home(self) -> int:
             '''
-            Send the motor to the PI location by moving 110% of the maximum number of steps.  The motor
-            will automatically and instantly stop at the PI locaiton.  The respectLimits variable will be reset
+            Send the motor to the PI location by moving 110% of the maximum number of steps.  Jog back and forth by the difference 
+            between max steps (or min steps) and the PI step to be sure to set the motor to the correct side of the PI trigger 
+            (if the PI exists).  
+            The motor will automatically and instantly stop at the PI locaiton.  The respectLimits variable will be reset
             to the original value after doing the home movement.  
             ### input:
             - none
@@ -273,15 +277,22 @@ class MCRControl():
             steps = (self.maxSteps * 1.1) * self.PISide
 
             # store current state of limit switches
-            resetIgnoreLimits = False
+            setIgnoreLimitsToFalse = False
             if not self.respectLimits:
-                resetIgnoreLimits = True
+                # reset respectLimits back to false after home
+                setIgnoreLimitsToFalse = True
                 self.setRespectLimits(True)
             
-            # move the motor
-            success = self.MCRBoard.MCRMove(self.motorID, steps=steps, speed=self.currentSpeed, acceleration=self.acceleration)
+            # move the motor to expected PI position
+            success = self.MCRBoard.MCRMove(self.motorID, steps=steps, speed=max(self.currentSpeed, MCR_FZ_HOME_SPEED), acceleration=self.acceleration)
+            if self.motorID == 0x01 or self.motorID == 0x02:
+                # confirm the motor is at the PI and not past the PI position, add an additional 100 steps over the expected (max - PIStep) difference to be sure since the physical max step is variable.  
+                piCheckSteps = (self.PIStep - self.maxSteps) if self.PISide == 1 else self.PIStep
+                self.MCRBoard.MCRMove(self.motorID, steps=(piCheckSteps - self.PISide * MCR_HARDSTOP_TOLERANCE), speed=max(self.currentSpeed, MCR_FZ_HOME_SPEED), acceleration=self.acceleration)
+                success = self.MCRBoard.MCRMove(self.motorID, steps=-(piCheckSteps - self.PISide * MCR_HARDSTOP_TOLERANCE * 2), speed=max(self.currentSpeed, MCR_FZ_HOME_SPEED), acceleration=self.acceleration)
+
             # reset the respect limit state
-            if resetIgnoreLimits: self.setRespectLimits(False)
+            if setIgnoreLimitsToFalse: self.setRespectLimits(False)
             if success:
                 self.currentStep = self.PIStep
             else:
@@ -294,9 +305,15 @@ class MCRControl():
         def moveAbs(self, step:int) -> int:
             '''
             Move the motor to the home position then to the absolute step number.  The step must be an integer
-            step number and can not be outside the PI position (i.e. can't be 8000 if the PI position is 7800)
+            step number.  If self.respectLimits is True, the target step must not exceed the PI step position.  
+            If the self.respectLimits is False, the target must be within the min-max step range.  
+
+            Backlash will be accounted for if the move is away from the PI location.  If the move exceeds the PI location, 
+            the backlash may not be accounted for due to limited number of steps available in the range.  If the target is 
+            step 8500 and the maximum steps are 8510 then only 10 steps of backlash are available which may not be enough 
+            to fully account for backlash.  
             ### input: 
-            - step: the final target step to move to (NOTE: backlash is compensated for becuase the abs move will always move away from the PI position. )
+            - step: the final target step to move to.
             ### return: 
             [
                 OK = 0 | 
@@ -328,8 +345,14 @@ class MCRControl():
             '''
             Move the motor by a number of steps.  This can be positive or negative movement.  
             By default this will compensate for backlash in the motor when moving towards the PI limit position.  
-            Steps won't exceed the motor limits but PI trigger will stop the motor.  If the steps go beyond the 
-            hard stop, the step counter will be off and the motor will have to be home initialized.  
+            If the target is within the backlash compenstation step number (i.e. <60 away from the 
+            home PI position) then the backlash correction will be limited 
+            to the difference between the home PI position (or min/max step if the PI is not regarded) and the 
+            target step.  
+
+            If the limits are regarded the motor won't go beyond the limit switch.  If they are not regarded, 
+            the motor could go beyond the min/max steps (i.e. the hard stop).  If it does then 
+            the step counter will be off and the motor will have to be home initialized.  
             ### input: 
             - steps: the number of steps to move
             - correctForBL (optional, True): set true to compensate for backlash when moving away from PI limit switch.  
@@ -349,14 +372,15 @@ class MCRControl():
 
             # move the motor
             success = False
+            blCorrection = MCR_BACKLASH_OVERSHOOT
             if correctForBL and (steps * self.PISide > 0):
-                # moving towards PI, add backlash adjustment
-                blCorrection = MCR_BACKLASH_OVERSHOOT
-                if (abs(self.PIStep - (steps + self.currentStep)) < MCR_BACKLASH_OVERSHOOT) and self.respectLimits:
-                    blCorrection = abs(self.PIStep - (steps + self.currentStep))
+                # moving towards PI, add backlash adjustment and keep any moves within PI limit or min/max limits
+                blCorrection = max(0,min(MCR_BACKLASH_OVERSHOOT, self.PIStep * ((self.PIStep if self.respectLimits else (self.maxSteps if self.PIStep > 0 else 0)) - (steps + self.currentStep))))
 
                 success = self.MCRBoard.MCRMove(self.motorID, steps + self.PISide * blCorrection, self.currentSpeed, self.acceleration)
-                success = self.MCRBoard.MCRMove(self.motorID, -self.PISide * blCorrection, self.currentSpeed, self.acceleration)
+                if blCorrection > 0: 
+                    # move back by the BL correction amount
+                    success = self.MCRBoard.MCRMove(self.motorID, -self.PISide * blCorrection, self.currentSpeed, self.acceleration)
             else:
                 # no need for backlash adjustment
                 success = self.MCRBoard.MCRMove(self.motorID, steps, self.currentSpeed, self.acceleration)
@@ -757,8 +781,9 @@ class MCRControl():
         # MCRSendCmd
         def MCRSendCmd(self, cmd, waitTime:int=10):
             '''
-            Send the command through the com port over USB connection to the board
-            Send the byte string to the MCR600 series board.  
+            Send the command through the com port over USB connection to the board.  This function should be 
+            chnged for UART or I2C communication protocol instead of USB.  
+            Send the byte string to the MCR-IQ board.  
             ### input: 
             - cmd: byte string to send
             - waitTime: (ms) wait before checking for a response
@@ -770,12 +795,12 @@ class MCRControl():
             if debugCheck: log.debug("   -> {}".format(":".join("{:02x}".format(c) for c in cmd)))
             self.serialPort.write(cmd)
 
-            # wait for a response (wait first then read the response)
+            # wait for a response (wait first then check for the response)
             response = bytearray(12)
             readSuccess = False
             startTime = time.time() * 1000
             while(time.time() * 1000 - waitTime < startTime): 
-                # wait until finished moving or until PI triggers serial port buffer response
+                # wait until finished moving (waitTime milliseconds) or until PI triggers serial port buffer response
                 if self.serialPort.in_waiting > 0: break
                 time.sleep(0.1)
 
