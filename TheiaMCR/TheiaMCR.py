@@ -28,6 +28,7 @@ MCR_FZ_HOME_SPEED = 1200              # (pps) speed to travel to home PI positio
 MCR_IRIS_DEFAULT_SPEED = 100          # (pps) default iris motor speed
 MCR_BACKLASH_OVERSHOOT = 60           # used to remove lens backlash, this should exceed lens maximum backlash amount
 MCR_HARDSTOP_TOLERANCE = 100          # additional move amount to be sure to pass home position from hard stop
+MCR_MOVE_REST_TIME = 0.05             # (s) rest time between moves
 
 #####################################################################################
 # MCRControl class
@@ -288,7 +289,9 @@ class MCRControl():
             if self.motorID == 0x01 or self.motorID == 0x02:
                 # confirm the motor is at the PI and not past the PI position, add an additional 100 steps over the expected (max - PIStep) difference to be sure since the physical max step is variable.  
                 piCheckSteps = (self.PIStep - self.maxSteps) if self.PISide == 1 else self.PIStep
+                time.sleep(MCR_MOVE_REST_TIME)
                 self.MCRBoard.MCRMove(self.motorID, steps=(piCheckSteps - self.PISide * MCR_HARDSTOP_TOLERANCE), speed=max(self.currentSpeed, MCR_FZ_HOME_SPEED), acceleration=self.acceleration)
+                time.sleep(MCR_MOVE_REST_TIME)
                 success = self.MCRBoard.MCRMove(self.motorID, steps=-(piCheckSteps - self.PISide * MCR_HARDSTOP_TOLERANCE * 2), speed=max(self.currentSpeed, MCR_FZ_HOME_SPEED), acceleration=self.acceleration)
 
             # reset the respect limit state
@@ -380,6 +383,7 @@ class MCRControl():
                 success = self.MCRBoard.MCRMove(self.motorID, steps + self.PISide * blCorrection, self.currentSpeed, self.acceleration)
                 if blCorrection > 0: 
                     # move back by the BL correction amount
+                    time.sleep(MCR_MOVE_REST_TIME)
                     success = self.MCRBoard.MCRMove(self.motorID, -self.PISide * blCorrection, self.currentSpeed, self.acceleration)
             else:
                 # no need for backlash adjustment
