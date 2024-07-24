@@ -790,7 +790,7 @@ class MCRControl():
             except ValueError as e:
                 log.error(f"Failed to parse response: response=[{', '.join([f'{int(x):02X}' for x in response])}] ({e})")
                 err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
-                return False
+                return False, None, None, None, None, None, None
             
             # combine the MSB and LSB bytes to get values
             maxSteps = (maxStepsMsb << 8) | maxStepsLsb
