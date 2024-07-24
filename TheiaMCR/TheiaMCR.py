@@ -740,16 +740,17 @@ class MCRControl():
             - max steps: maximum number of steps in the range of the motor
             - min speed: (pps) minimum speed
             - max speed: (pps) maximum speed
+            NOTE: The returned values may be None if reading the motor setup is unsuccessful
             ### input: 
             - id: motor id (focus/zoom/iris/IRC)
             ### return: 
             [
-                success: True if MCR returned a valid response |
-                motor type: stepper (0) or DC (1) | 
-                use left stop: True/False | 
-                use right stop: True/False | 
-                max steps: maximum number of steps | 
-                min speed: minimum speed | 
+                success: True if MCR returned a valid response,
+                motor type: stepper (0) or DC (1), 
+                use left stop: True/False, 
+                use right stop: True/False, 
+                max steps: maximum number of steps, 
+                min speed: minimum speed, 
                 max speed: maximum speed
             ]
             '''
