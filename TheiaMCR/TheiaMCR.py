@@ -81,6 +81,7 @@ class MCRControl():
                     timeout=0.1,
                     stopbits=serial.STOPBITS_ONE,
                 )
+                success = 1
                 log.debug(f"Serial communication opened on {serial_port} successfully")
             except serial.SerialException as e:
                 log.error("Serial port not open {}".format(e))
