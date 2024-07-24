@@ -42,7 +42,7 @@ class MCRControl():
     iris = None
     
     # MCRInit
-    def __init__(self, com:str):
+    def __init__(self, serial_port:str):
         '''
         This class is used for interacting with the Theia MCR motor control boards. 
         Initialize the MCR board (this class) before any commands can be sent.  
@@ -74,9 +74,14 @@ class MCRControl():
         else:
             # initialize board
             try:
-                self.serialPort = serial.Serial(port = com, baudrate=115200, bytesize=8, timeout=0.1, stopbits=serial.STOPBITS_ONE)
-                success = int(com[3:])
-                log.debug(f'Comport {success} communication success')
+                self.serialPort = serial.Serial(
+                    port=serial_port,
+                    baudrate=115200,
+                    bytesize=8,
+                    timeout=0.1,
+                    stopbits=serial.STOPBITS_ONE,
+                )
+                log.debug(f"Serial communication opened on {serial_port} successfully")
             except serial.SerialException as e:
                 log.error("Serial port not open {}".format(e))
                 err.saveError(err.ERR_SERIAL_PORT, err.MOD_MCR, err.errLine())
