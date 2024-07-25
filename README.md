@@ -54,7 +54,7 @@ More information about the available functions can be found in the [wiki](https:
 
 # License
 Theia Technologies BSD license
-Copyright 2023 Theia Technologies
+Copyright 2023-2024 Theia Technologies
 
 # Contact information
 For more information contact: 
@@ -62,4 +62,4 @@ Mark Peterson at Theia Technologies
 [mpeterson@theiatech.com](mailto://mpeterson@theiatech.com)
 
 # Revision
-v.2.2.1
+v.2.3.0
