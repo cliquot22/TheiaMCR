@@ -729,6 +729,123 @@ class MCRControl():
                 err.saveError(err.ERR_MOVE_TIMEOUT, err.MOD_MCR, err.errLine())
                 success = False
             return success
+        
+        # MCRReadConfig
+        def MCRReadMotorSetup(self, id:int) -> tuple:
+            '''
+            Read the configuration of the motor.  The configuration includes: 
+            - motor type: stepper (0) or DC (1)
+            - use left stop: True/False
+            - use right stop: True/False
+            - max steps: maximum number of steps in the range of the motor
+            - min speed: (pps) minimum speed
+            - max speed: (pps) maximum speed
+            NOTE: The returned values may be None if reading the motor setup is unsuccessful
+            ### input: 
+            - id: motor id (focus/zoom/iris/IRC)
+            ### return: 
+            [
+                success: True if MCR returned a valid response,
+                motor type: stepper (0) or DC (1), 
+                use left stop: True/False, 
+                use right stop: True/False, 
+                max steps: maximum number of steps, 
+                min speed: minimum speed, 
+                max speed: maximum speed
+            ]
+            '''
+            if id not in [MCR_FOCUS_MOTOR_ID, MCR_ZOOM_MOTOR_ID, MCR_IRIS_MOTOR_ID, MCR_IRC_MOTOR_ID]:
+                log.error("Error: Motor ID not recognized")
+                err.saveError(err.ERR_RANGE, err.MOD_MCR, err.errLine())
+                return False, None, None, None, None, None, None
+            
+            command = bytearray(3)
+            command[0] = 0x67
+            command[1] = id
+            command[2] = 0x0D
+            response = self.MCRSendCmd(command)
+
+            # Check against invalid motor id
+            # [0x67, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x0D]
+            if response[1] == 0xFF:
+                log.error("Error: controller responded with invalid motor id")
+                err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
+                return False, None, None, None, None, None, None
+
+            try:
+                # Parse the response
+                (
+                    commandId,
+                    motorId,
+                    motorType,
+                    useLeftStop,
+                    useRightStop,
+                    maxStepsMsb,
+                    maxStepsLsb,
+                    minSpeedMsb,
+                    minSpeedLsb,
+                    maxSpeedMsb,
+                    maxSpeedLsb,
+                    _,  # carriage return
+                ) = response
+            except ValueError as e:
+                log.error(f"Failed to parse response: response=[{', '.join([f'{int(x):02X}' for x in response])}] ({e})")
+                err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
+                return False, None, None, None, None, None, None
+            
+            # combine the MSB and LSB bytes to get values
+            maxSteps = (maxStepsMsb << 8) | maxStepsLsb
+            minSpeed = (minSpeedMsb << 8) | minSpeedLsb
+            maxSpeed = (maxSpeedMsb << 8) | maxSpeedLsb
+            
+            return True, int(motorType), bool(useLeftStop), bool(useRightStop), int(maxSteps), int(minSpeed), int(maxSpeed)
+
+        # MCRWriteConfig
+        def MCRWriteMotorSetup(self, id:int, useLeftStop:bool, useRightStop:bool, maxSteps:int, minSpeed:int, maxSpeed:int) -> bool:
+            '''
+            Write the configuration of the motor.
+            ### input: 
+            - id: motor id (focus/zoom/iris/IRC)
+            - useLeftStop: True/False (wide/far stops)
+            - useRightStop: True/False (tele/near stops)
+            - maxSteps: maximum number of steps
+            - minSpeed: minimum speed
+            - maxSpeed: maximum speed
+            ### return: 
+            [True] if MCR returned a valid response
+            '''
+            # check the motor ID
+            if id in [MCR_FOCUS_MOTOR_ID, MCR_ZOOM_MOTOR_ID, MCR_IRIS_MOTOR_ID]:
+                motorType = 0x00  # Stepper motor
+            elif id in [MCR_IRC_MOTOR_ID]:
+                motorType = 0x01
+            else:
+                log.error("Error: Motor ID not recognized")
+                err.saveError(err.ERR_RANGE, err.MOD_MCR, err.errLine())
+                return False
+
+            # structure the command
+            command = bytearray(12)
+            command[0] = 0x63
+            command[1] = id
+            command[2] = motorType
+            command[3] = int(useLeftStop)
+            command[4] = int(useRightStop)
+            command[5] = (maxSteps >> 8) & 0xFF
+            command[6] = maxSteps & 0xFF
+            command[7] = (minSpeed >> 8) & 0xFF
+            command[8] = minSpeed & 0xFF
+            command[9] = (maxSpeed >> 8) & 0xFF
+            command[10] = maxSpeed & 0xFF
+            command[11] = 0x0D
+            response = self.MCRSendCmd(command)
+
+            # check the response
+            if response[1] != 0x00:
+                log.error("Error: init motor response")
+                err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
+                return False
+            return True
 
         # MCRRegardLimits
         def MCRRegardLimits(self, id:int, state:bool=True, PISide:int=1) -> bool:
