@@ -16,7 +16,7 @@ Upload the final version: twine upload --skip-existing dist/*
 --Time out if no response from comport (MCR not connected to that com port)
 
 # revision history
-v.2.3.0 240725 added MCRWriteMotorSetup and MCRReadMotorSetup commands (written by aseligmann) starting at line 606
+v.2.3.0~2 240725 added MCRWriteMotorSetup and MCRReadMotorSetup commands (written by aseligmann) starting at line 606
                 changed com port to work with UNIX (written by aseligmann) by changing the return value in new line 84
                 changed MCR_MOVE_REST_TIME = 0.01 from longer 0.05s
     v.2.2.1 240326 added rest time between moves (backlash and homeing) to reduce motor reversal

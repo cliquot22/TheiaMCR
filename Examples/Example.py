@@ -66,9 +66,37 @@ def changeComPathExample(comport:str):
     # wait >700ms for board to reboot
     time.sleep(1)
 
+def motorConfiguration(comport:str):
+    '''
+    Read the motor configuration for one motor (min/max speeds, max steps).  
+    Set the motor configuration programatically for one motor.  
+    ### input  
+    - comport: com port string ('com4' for example)
+    '''
+    MCR = mcr.MCRControl(comport)
+    
+    # initialize the motors (Theia TL1250P N6 lens in this case)
+    MCR.focusInit(8390, 7959)
+    MCR.zoomInit(3227, 3119)
+    MCR.irisInit(75)
+    MCR.IRCInit()
+
+    # write some data to the board (the correct values are set during motor initialization,  this will overwrite the values)
+    success = MCR.MCRBoard.MCRWriteMotorSetup(0x01, useLeftStop=True, useRightStop=False, maxSteps=9000, minSpeed=200, maxSpeed=1200)
+    log.info(f'Configuration written {success}')
+
+    # read focus motor configuration (id = 0x01)
+    success, motorType, leftStop, rightStop, maxSteps, minSpeed, maxSpeed = MCR.MCRBoard.MCRReadMotorSetup(0x01)
+    if success:
+        log.info(f'Motor type: {motorType}, use stops: ({leftStop},{rightStop}), max steps: {maxSteps}, speed range ({minSpeed},{maxSpeed})')
+    else:
+        log.info('Error reading the configuration')
+
+
 if __name__ == '__main__':
     # virtual com port
     comport = 'com4'
 
-    moveMotorsExample(comport)
+    #moveMotorsExample(comport)
     #changeComPathExample(comport)
+    motorConfiguration(comport)
