@@ -1,23 +1,10 @@
-# creation
-create and install a local package
-https://towardsdatascience.com/building-a-python-package-without-publishing-e2d36c4686cd
-create this setup.py file at the top level
-install in virtual env with pip install .
-
-uploading to pypi
-https://packaging.python.org/en/latest/tutorials/packaging-projects/ 
-Install the latest build: py -m pip install --upgrade build
-Build the distribution files: py -m build
-Upload to the test environment: py -m twine upload --skip-existing --repository testpypi dist/*
-Test install: py -m pip install --index-url https://test.pypi.org/simple/ --no-deps TheiaMCR
-Upload the final version: twine upload --skip-existing dist/* 
-
 # to do
 --Time out if no response from comport (MCR not connected to that com port)
 
 # revision history
+    v.2.3.3 241001 fixed SN return formatting in readBoardSN()
 v.2.3.0~2 240725 added MCRWriteMotorSetup and MCRReadMotorSetup commands (written by aseligmann) starting at line 606
-                changed com port to work with UNIX (written by aseligmann) by changing the return value in new line 84
+                changed com port to work with Linux (written by aseligmann) by changing the return value in new line 84
                 changed MCR_MOVE_REST_TIME = 0.01 from longer 0.05s
     v.2.2.1 240326 added rest time between moves (backlash and homeing) to reduce motor reversal
 v.2.2.0 240318 changed (home) function to be sure motor is not past the PI position.  Added a step-back amount in case the current step is past the PI position.  
