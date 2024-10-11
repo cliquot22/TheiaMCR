@@ -52,6 +52,9 @@ Each motor has these variables available
 
 More information about the available functions can be found in the [wiki](https://github.com/cliquot22/TheiaMCR/wiki) pages.   
 
+# Logging
+There are logging commands in the module using Python's logging libray.  These are set by default to log WARNING and higher levels.  To see other log prints, initialize the class with `MCR = TheiaMCR.MCRControl(serial_port="com4", degubLog=True)` or manually set the logging level with `TheiaMCR.log.setLevel(logging.INFO)`.  
+
 # License
 Theia Technologies BSD license
 Copyright 2023-2024 Theia Technologies

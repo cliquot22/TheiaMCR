@@ -12,8 +12,13 @@
 import serial
 import time
 import TheiaMCR.errList as err
-import logging as log
+import logging
 from typing import Tuple, Union
+
+# create a logger instance for this module
+log = logging.getLogger(__name__)
+log.setLevel(logging.WARNING)
+log.addHandler(logging.NullHandler())
 
 # internal constants used across the classes in this module.  
 RESPONSE_READ_TIME = 500                # (ms) max time for the MCR to post a response in the buffer
@@ -42,7 +47,7 @@ class MCRControl():
     iris = None
     
     # MCRInit
-    def __init__(self, serial_port:str):
+    def __init__(self, serial_port:str, debugLog:bool=False):
         '''
         This class is used for interacting with the Theia MCR motor control boards. 
         Initialize the MCR board (this class) before any commands can be sent.  
@@ -52,6 +57,7 @@ class MCRControl():
         This is the top level class for all interactions with the MCR600 series boards
         ### input: 
         - serial_portr: the serial port name of the board (e.g. "com21" or "/dev/ttyAMA0").   
+        - debugLog (optional boolean: False): Set true to turn on the debug logging stream
         ### Public functions: 
         - __init__(self, com:str)
         - focusInit(self, steps:int, pi:int, move:bool=True, accel:int=0) -> bool
@@ -68,6 +74,11 @@ class MCRControl():
         (c)2023-2024 Theia Technologies
         www.TheiaTech.com
         '''
+        if debugLog:
+            log.setLevel(logging.DEBUG)
+        else:
+            log.setLevel(logging.WARNING)
+            
         success = 0
         if self.MCRInitialized:
             success = 1

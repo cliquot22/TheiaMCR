@@ -2,6 +2,7 @@
 --Time out if no response from comport (MCR not connected to that com port)
 
 # revision history
+    v.2.3.4 241011 created logging handler
     v.2.3.3 241001 fixed SN return formatting in readBoardSN()
 v.2.3.0~2 240725 added MCRWriteMotorSetup and MCRReadMotorSetup commands (written by aseligmann) starting at line 606
                 changed com port to work with Linux (written by aseligmann) by changing the return value in new line 84
