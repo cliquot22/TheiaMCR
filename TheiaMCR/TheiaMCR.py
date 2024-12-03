@@ -94,20 +94,21 @@ class MCRControl():
                 )
                 success = 1
                 log.debug(f"Serial communication opened on {serial_port} successfully")
+                self.controllerClass.serialPort = self.serialPort
+                self.MCRBoard = self.controllerClass()
             except serial.SerialException as e:
                 log.error("Serial port not open {}".format(e))
                 err.saveError(err.ERR_SERIAL_PORT, err.MOD_MCR, err.errLine())
                 success = err.ERR_SERIAL_PORT
 
+        if success >= 0:
             # send a test command to the board to read FW version
-            self.controllerClass.serialPort = self.serialPort
-            self.MCRBoard = self.controllerClass()
-        response = self.MCRBoard.readFWRevision()
-        if int(response.rsplit('.', -1)[0]) < 5:
-            log.error("Error: No resonse received from MCR controller")
-            err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
-            success = err.ERR_NO_COMMUNICATION
-        self.MCRInitialized = True if success >= 0 else False
+            response = self.MCRBoard.readFWRevision()
+            if int(response.rsplit('.', -1)[0]) < 5:
+                log.error("Error: No resonse received from MCR controller")
+                err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
+                success = err.ERR_NO_COMMUNICATION
+        self.MCRInitialized = True if success > 0 else False
 
         # added for Mathlab initialization
         self.focus = None 
