@@ -57,7 +57,7 @@ There are logging commands in the module using Python's logging libray.  These a
 
 # License
 Theia Technologies BSD license
-Copyright 2023-2024 Theia Technologies
+Copyright 2023-2025 Theia Technologies
 
 # Contact information
 For more information contact: 
@@ -65,4 +65,4 @@ Mark Peterson at Theia Technologies
 [mpeterson@theiatech.com](mailto://mpeterson@theiatech.com)
 
 # Revision
-v.2.3.5
+v.2.4.0

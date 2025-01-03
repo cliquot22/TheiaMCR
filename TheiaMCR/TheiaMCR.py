@@ -30,15 +30,15 @@ MCR_IRC_MOTOR_ID = 0x04
 MCR_IRC_SWITCH_TIME = 50              # (ms) switch time for IRC
 MCR_FZ_DEFAULT_SPEED = 1000           # (pps) default focus/zoom motor speeds
 MCR_FZ_HOME_SPEED = 1200              # (pps) speed to travel to home PI position
+MCR_FZ_APPROACH_SPEED = 500           # (pps) slow home approach speed for PI position
 MCR_IRIS_DEFAULT_SPEED = 100          # (pps) default iris motor speed
 MCR_BACKLASH_OVERSHOOT = 60           # used to remove lens backlash, this should exceed lens maximum backlash amount
-MCR_HARDSTOP_TOLERANCE = 100          # additional move amount to be sure to pass home position from hard stop
-MCR_MOVE_REST_TIME = 0.01             # (s) rest time between moves
+MCR_HARDSTOP_TOLERANCE = 200          # additional move amount to be sure to pass home position from hard stop (works best to prevent motor reversing if >100 steps)
+MCR_MOVE_REST_TIME = 0.010            # (s) rest time between moves
 
 #####################################################################################
 # MCRControl class
 class MCRControl():
-    serialPort = 'com4'
     MCRInitialized = False
 
     MCRBoard = None         # controller board instance
@@ -47,7 +47,7 @@ class MCRControl():
     iris = None
     
     # MCRInit
-    def __init__(self, serial_port:str, debugLog:bool=False):
+    def __init__(self, serialPort:str, debugLog:bool=False):
         '''
         This class is used for interacting with the Theia MCR motor control boards. 
         Initialize the MCR board (this class) before any commands can be sent.  
@@ -86,14 +86,14 @@ class MCRControl():
             # initialize board
             try:
                 self.serialPort = serial.Serial(
-                    port=serial_port,
+                    port=serialPort,
                     baudrate=115200,
                     bytesize=8,
                     timeout=0.1,
                     stopbits=serial.STOPBITS_ONE,
                 )
                 success = 1
-                log.debug(f"Serial communication opened on {serial_port} successfully")
+                log.debug(f"Serial communication opened on {serialPort} successfully")
                 self.controllerClass.serialPort = self.serialPort
                 self.MCRBoard = self.controllerClass()
             except serial.SerialException as e:
@@ -292,9 +292,6 @@ class MCRControl():
                 err_bad_move: (PI was nto set or triggered (call motorInit first))
             ]
             '''
-            # determine direction of PI
-            steps = (self.maxSteps * 1.1) * self.PISide
-
             # store current state of limit switches
             setIgnoreLimitsToFalse = False
             if not self.respectLimits:
@@ -302,15 +299,19 @@ class MCRControl():
                 setIgnoreLimitsToFalse = True
                 self.setRespectLimits(True)
             
-            # move the motor to expected PI position
-            success = self.MCRBoard.MCRMove(self.motorID, steps=steps, speed=max(self.currentSpeed, MCR_FZ_HOME_SPEED), acceleration=self.acceleration)
+            # move the motor to expected PI position (110% of max steps)
+            success = self.MCRBoard.MCRMove(self.motorID, steps=(self.maxSteps * 1.1) * self.PISide, speed=max(self.currentSpeed, MCR_FZ_HOME_SPEED), acceleration=self.acceleration)
             if self.motorID == 0x01 or self.motorID == 0x02:
-                # confirm the motor is at the PI and not past the PI position, add an additional 100 steps over the expected (max - PIStep) difference to be sure since the physical max step is variable.  
+                # confirm the motor is at the PI and not past the PI position, move the difference between max steps and PI position + 40 steps over the expected (max - PIStep) to be sure since the physical max step is variable.  
                 piCheckSteps = (self.PIStep - self.maxSteps) if self.PISide == 1 else self.PIStep
                 time.sleep(MCR_MOVE_REST_TIME)
+                # move away from PI at full speed
                 self.MCRBoard.MCRMove(self.motorID, steps=(piCheckSteps - self.PISide * MCR_HARDSTOP_TOLERANCE), speed=max(self.currentSpeed, MCR_FZ_HOME_SPEED), acceleration=self.acceleration)
                 time.sleep(MCR_MOVE_REST_TIME)
-                success = self.MCRBoard.MCRMove(self.motorID, steps=-(piCheckSteps - self.PISide * MCR_HARDSTOP_TOLERANCE * 2), speed=max(self.currentSpeed, MCR_FZ_HOME_SPEED), acceleration=self.acceleration)
+                # move back, towards PI at full speed but not all the way
+                self.MCRBoard.MCRMove(self.motorID, steps=-piCheckSteps + self.PISide * (MCR_HARDSTOP_TOLERANCE - 50), speed=max(self.currentSpeed, MCR_FZ_HOME_SPEED), acceleration=self.acceleration)
+                # slow down and hit PI at slower speed
+                success = self.MCRBoard.MCRMove(self.motorID, steps=self.PISide * 100, speed=MCR_FZ_APPROACH_SPEED, acceleration=self.acceleration)
 
             # reset the respect limit state
             if setIgnoreLimitsToFalse: self.setRespectLimits(False)
@@ -524,7 +525,7 @@ class MCRControl():
             - MCRRegardLimits(self, id:int, state:bool=True, PISide:int=1) -> bool
             - MCRSendCmd(self, cmd, waitTime:int=10)
             '''
-            pass
+            self.debugPrint = False     # set to print byte strings to the controller (TheiaMCR.zoom.MCRBoard.debugPrint = True: get the right instance of this class)
 
         # ----------- board information --------------------
         # get the FW revision from the board
@@ -930,9 +931,8 @@ class MCRControl():
             ### return: 
             [return byte string from MCR]
             '''
-            debugCheck = False   # set True to print send/receive byte strings
             # send the string
-            if debugCheck: log.debug("   -> {}".format(":".join("{:02x}".format(c) for c in cmd)))
+            if self.debugPrint: log.debug("   -> {}".format(":".join("{:02x}".format(c) for c in cmd)))
             self.serialPort.write(cmd)
 
             # wait for a response (wait first then check for the response)
@@ -964,5 +964,5 @@ class MCRControl():
                 log.warning("MCR send command timed out without response")
 
             # return response
-            if debugCheck: log.debug("  <- None") if response == None else log.debug("   <- {}".format(":".join("{:02x}".format(c) for c in response)))
+            if self.debugPrint: log.debug("  <- None") if response == None else log.debug("   <- {}".format(":".join("{:02x}".format(c) for c in response)))
             return response
