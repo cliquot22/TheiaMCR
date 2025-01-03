@@ -4,6 +4,7 @@
 # revision history
 v.2.4.0 241220 increased PI home overshoot to >100 steps to reduce zoom motor reversing
                 added slow approace to PI home location 
+                added searchComPorts() to examples
     v.2.3.5 241203 (__init__) Stopped initialization if comport open was not successful
     v.2.3.4 241011 created logging handler
     v.2.3.3 241001 fixed SN return formatting in readBoardSN()

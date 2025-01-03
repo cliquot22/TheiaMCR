@@ -5,8 +5,23 @@
 import TheiaMCR as mcr
 import logging as log
 import time
+import serial.tools.list_ports
 
 log.basicConfig(level=log.DEBUG, format='%(levelname)-7s ln:%(lineno)-4d %(module)-18s  %(message)s')
+
+def searchComPorts():
+    '''
+    Search the connected com ports.  
+    ### return:  
+    [list of connected ports]
+    '''
+    ports = serial.tools.list_ports.comports()
+    portList = []
+    for port, desc, hwid in sorted(ports):
+        log.info("Ports: {} [{}]".format(desc, hwid))
+        portList.append(port)
+    log.info(f'Port list: {portList}')
+    return portList
 
 def moveMotorsExample(comport:str):
     '''
@@ -15,6 +30,7 @@ def moveMotorsExample(comport:str):
     - comport: com port string ('com4' for example)
     '''
     # create the motor control board instance
+    log.info('Initializing lens')
     MCR = mcr.MCRControl(comport)
 
     # initialize the motors (Theia TL1250P N6 lens in this case)
@@ -25,25 +41,38 @@ def moveMotorsExample(comport:str):
     time.sleep(1)
 
     # move the focus motor
+    log.info('Move focus absolute (home and move)')
     MCR.focus.moveAbs(6000)
     log.info(f'Focus step {MCR.focus.currentStep}')
+    time.sleep(1)
+    log.info('Move focus relative')
     MCR.focus.moveRel(-1000)
     log.info(f'Focus step {MCR.focus.currentStep}')
-    time.sleep(1)
+    time.sleep(2)
 
     # move the zoom motor at a slower speed
+    log.info('Move zoom at 600pps')
     MCR.zoom.setMotorSpeed(600)
     MCR.zoom.moveRel(-600)
     log.info(f'Zoom step {MCR.zoom.currentStep}')
-    time.sleep(1)
+    time.sleep(2)
 
     # close the iris half way
+    log.info('Setting iris to 1/2 open')
     MCR.iris.moveRel(40)
+    time.sleep(2)
 
     # switch the IRC
+    log.info('Setting IRC state')
     MCR.IRCState(1)
     time.sleep(1)
     MCR.IRCState(0)
+    time.sleep(2)
+
+    # reset
+    log.info('Reset lens')
+    MCR.zoom.setMotorSpeed(1200)
+    MCR.iris.home()
 
 def changeComPathExample(comport:str):
     '''
@@ -73,6 +102,7 @@ def motorConfiguration(comport:str):
     ### input  
     - comport: com port string ('com4' for example)
     '''
+    log.info('Initializing lens')
     MCR = mcr.MCRControl(comport)
     
     # initialize the motors (Theia TL1250P N6 lens in this case)
@@ -82,10 +112,15 @@ def motorConfiguration(comport:str):
     MCR.IRCInit()
 
     # write some data to the board (the correct values are set during motor initialization,  this will overwrite the values)
-    success = MCR.MCRBoard.MCRWriteMotorSetup(0x01, useLeftStop=True, useRightStop=False, maxSteps=9000, minSpeed=200, maxSpeed=1200)
-    log.info(f'Configuration written {success}')
+    setMaxSteps = 9000
+    setMinSpeed = 200
+    setMaxSpeed = 1200
+    log.info(f'Write motor configuration: use stops: (True,False), max steps: {setMaxSteps}, speed range: ({setMinSpeed},{setMaxSpeed})')
+    success = MCR.MCRBoard.MCRWriteMotorSetup(0x01, useLeftStop=True, useRightStop=False, maxSteps=setMaxSteps, minSpeed=setMinSpeed, maxSpeed=setMaxSpeed)
+    log.info(f'Configuration written result: {success}')
 
     # read focus motor configuration (id = 0x01)
+    log.info('Read motor configuration')
     success, motorType, leftStop, rightStop, maxSteps, minSpeed, maxSpeed = MCR.MCRBoard.MCRReadMotorSetup(0x01)
     if success:
         log.info(f'Motor type: {motorType}, use stops: ({leftStop},{rightStop}), max steps: {maxSteps}, speed range ({minSpeed},{maxSpeed})')
@@ -94,7 +129,7 @@ def motorConfiguration(comport:str):
 
 
 if __name__ == '__main__':
-    # virtual com port
+    #searchComPorts()
     comport = 'com4'
 
     #moveMotorsExample(comport)
