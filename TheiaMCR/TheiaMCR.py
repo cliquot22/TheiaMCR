@@ -572,7 +572,7 @@ class MCRControl():
             else:
                 sn = f'{response[1]:02x}{response[2]:02x}'
                 sn = sn[:-1]
-                sn += f'-00{response[-3]:02x}{response[-2]:02x}'
+                sn += f'-{response[-4]:02x}{response[-3]:02x}{response[-2]:02x}'
                 log.info(f"Baord serial number {sn}")
             return sn
         

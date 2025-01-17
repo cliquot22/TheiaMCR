@@ -2,6 +2,7 @@
 --Time out if no response from comport (MCR not connected to that com port)
 
 # revision history
+    v.2.4.1 250117 (line 575) updated SN for >055-009999
 v.2.4.0 241220 increased PI home overshoot to >100 steps to reduce zoom motor reversing
                 added slow approach to PI home location 
                 added searchComPorts() to examples
