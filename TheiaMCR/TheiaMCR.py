@@ -390,7 +390,7 @@ class MCRControl():
             # check for limits
             limit, steps = self.checkLimits(steps, self.respectLimits)
             if self.respectLimits and (limit != 0):
-                log.warn(f'Limiting focus relative steps to {steps}')
+                log.warning(f'Limiting focus relative steps to {steps}')
 
             # move the motor
             success = False
@@ -894,6 +894,18 @@ class MCRControl():
 
             res = bytearray(12)
             res = self.MCRSendCmd(getCmd)
+            if len(res) == 0: 
+                # no response from board for current state
+                log.warning("Warning: no response from MCR board")
+                return False
+            # exctract the proper response if the variable res includes more than one response
+            for i in range(len(res)):
+                if res[i] == getCmd[0]:
+                    res = res[i:i+12]
+                    break
+            if len(res) > 12: 
+                log.warning("Warning: MCR board response too long ({})".format(":".join("{:02x}".format(c) for c in res)))
+                return False
             setCmd = bytearray(12)
             for i, b in enumerate(res):
                 setCmd[i] = b
