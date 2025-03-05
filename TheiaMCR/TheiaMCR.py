@@ -13,7 +13,8 @@ import serial
 import time
 import TheiaMCR.errList as err
 import logging
-from typing import Tuple, Union
+from typing import Tuple, Union, Optional, get_type_hints
+from functools import wraps
 
 # create a logger instance for this module
 log = logging.getLogger(__name__)
@@ -36,6 +37,44 @@ MCR_BACKLASH_OVERSHOOT = 60           # used to remove lens backlash, this shoul
 MCR_HARDSTOP_TOLERANCE = 200          # additional move amount to be sure to pass home position from hard stop (works best to prevent motor reversing if >100 steps)
 MCR_MOVE_REST_TIME = 0.010            # (s) rest time between moves
 
+##### wrapper functions to check for initialization ##############
+# function return values if MCRControl is not initialized
+MCRReturnFallback = {
+    int: err.ERR_NOT_INIT,
+    str: None,
+    bool: False,
+    Tuple[bool, int, bool, bool, int, int, int]: (False, err.ERR_NOT_INIT, False, False, -1, -1, -1), # return code for MCRReadMotorSetup
+}
+
+def MCRInitRequired(func):
+    '''
+    Decorator to check if MCRControl or specific motor is not initialized before calling a method.
+    If MCRControl is not initialized, it will log an error and return an error code.
+    ### return: 
+    MCRReturnFallback values depending on function return value if MCRControl is not initialized
+    '''
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        if not self.MCRInitialized:
+            log.error(f"ERROR: {func.__name__} cannot be called because MCRControl or motor is not initialized")
+            err.saveError(err.ERR_NOT_INIT, err.MOD_MCR, err.errLine())
+            return MCRReturnFallback.get(get_type_hints(func).get('return', None), None)
+        return func(self, *args, **kwargs)
+    return wrapper
+
+class MCRInitFailed:
+    '''
+    This class is used to handle the case when MCRControl is not initialized.
+    It provides a way to prevent crashes when trying to access methods or attributes
+    of MCRControl when it is not initialized.
+    '''
+    def __getattr__(self, name):
+        def method(*args, **kwargs):
+            log.error(f'{name} cannot be executed because MCRBoard is not initialized.')
+            err.saveError(err.ERR_NOT_INIT, err.MOD_MCR, err.errLine())
+            return err.ERR_NOT_INIT
+        return method
+    
 #####################################################################################
 # MCRControl class
 class MCRControl():
@@ -110,12 +149,19 @@ class MCRControl():
                 success = err.ERR_NO_COMMUNICATION
         self.MCRInitialized = True if success > 0 else False
 
-        # added for Mathlab initialization
-        self.focus = None 
-        self.zoom = None
-        self.iris = None
+        # ultimate success
+        if success >= 0:
+            self.focus = None 
+            self.zoom = None
+            self.iris = None
+        else:
+            self.focus = MCRInitFailed()
+            self.zoom = MCRInitFailed()
+            self.iris = MCRInitFailed()
+            self.MCRBoard = MCRInitFailed()
 
     # Motor initialization
+    @MCRInitRequired
     def focusInit(self, steps:int, pi:int, move:bool=True, accel:int=0) -> bool:
         '''
         Initialize the parameters of the motor.  This must be called after the board is initialized.  
@@ -125,11 +171,12 @@ class MCRControl():
         - move: (optional, True) move motor to home position or (False) initialize without moving. 
         - accel: (optional, 0) motor acceleration steps (check motor control documentation to see if this variable is supported in firmware)
         ### return: 
-        [True] if motor initialization was successful
+        [True | (False, error int)] if motor initialization was successful or not
         '''
         self.focus = self.motor(MCR_FOCUS_MOTOR_ID, steps, pi, move, accel)
         return self.focus.initialized
     
+    @MCRInitRequired
     def zoomInit(self, steps:int, pi:int, move:bool=True, accel:int=0) -> bool:
         '''
         Initialize the parameters of the motor.  This must be called after the board is initialized.  
@@ -139,11 +186,12 @@ class MCRControl():
         - move: (optional, True) move motor to home position or (False) initialize without moving. 
         - accel: (optional, 0) motor acceleration steps (check motor control documentation to see if this variable is supported in firmware)
         ### return: 
-        [True] if motor initialization was successful
+        [True | (False, error int)] if motor initialization was successful or not
         '''
         self.zoom = self.motor(MCR_ZOOM_MOTOR_ID, steps, pi, move, accel)
         return self.zoom.initialized
     
+    @MCRInitRequired
     def irisInit(self, steps:int, move:bool=True) -> bool:
         '''
         Initialize the parameters of the motor.  This must be called after the board is initialized.  
@@ -151,25 +199,26 @@ class MCRControl():
         - steps: maximum number of steps
         - move: (optional, True) move motor to home position or (False) initialize without moving. 
         ### return: 
-        [True] if motor initialization was successful
+        [True | (False, error int)] if motor initialization was successful or not
         '''
         self.iris = self.motor(MCR_IRIS_MOTOR_ID, steps, 0, move, 0)
         return self.iris.initialized
 
     # IRCInit
+    @MCRInitRequired
     def IRCInit(self) -> bool:
         '''
         Initialize the parameters of the IRC motor.  
         For the IRC switch motor: maximum 1000 steps allows 1 second activation time (at speed 1000pps).  The activation
         time is set by the number of steps (1 step = 1 ms).  See the motor control docuemtation for more info.  
         ### return: 
-        [initizlized success]
+        [True | (False, error int)] if motor initialization was successful or not
         '''
         success = self.MCRBoard.MCRMotorInit(MCR_IRC_MOTOR_ID, pi=0, steps=1000, speedRange=1, DCMotorType=True)
-        #####_err = self.motor(MCR_IRC_MOTOR_ID, steps=1000, pi=0, DCMotorType=True, move=False)
         return success
 
     # IRCState
+    @MCRInitRequired
     def IRCState(self, state:int) -> int:
         '''
         Set the IRC state to either visible or clear filter (or other options depending on the lens model)
@@ -178,7 +227,7 @@ class MCRControl():
         2: clear filter 2  
         ]
         ### return: 
-        [new state (1 | 2)]
+        [new state (1 | 2) | error code] (error code <0)
         '''
         sw = MCR_IRC_SWITCH_TIME  ## move in positive direction
         if state == 1:
@@ -274,6 +323,7 @@ class MCRControl():
                     err.saveError(error, err.MOD_MCR, err.errLine())
 
         # Home
+        @MCRInitRequired
         def home(self) -> int:
             '''
             Send the motor to the PI location by moving 110% of the maximum number of steps.  Jog back and forth by the difference 
@@ -324,6 +374,7 @@ class MCRControl():
             return OK
         
         # moveAbs
+        @MCRInitRequired
         def moveAbs(self, step:int) -> int:
             '''
             Move the motor to the home position then to the absolute step number.  The step must be an integer
@@ -363,6 +414,7 @@ class MCRControl():
             return OK
         
         # moveRel
+        @MCRInitRequired
         def moveRel(self, steps:int, correctForBL:bool=True) -> int:
             '''
             Move the motor by a number of steps.  This can be positive or negative movement.  
@@ -415,6 +467,7 @@ class MCRControl():
             return OK
         
         # setRespectLimits
+        @MCRInitRequired
         def setRespectLimits(self, state:bool):
             '''
             Set the flag to stop motor moves at the PI limits or to continue past the limits.  In some cases
@@ -429,6 +482,7 @@ class MCRControl():
             self.MCRBoard.MCRRegardLimits(self.motorID, state, self.PISide)
 
         # setMotorSpeed
+        @MCRInitRequired
         def setMotorSpeed(self, speed) -> int:
             '''
             Set the motor speed.  It should be in the range.  
@@ -529,6 +583,7 @@ class MCRControl():
 
         # ----------- board information --------------------
         # get the FW revision from the board
+        @MCRInitRequired
         def readFWRevision(self) -> str:
             '''
             Get FW revision on the board. 
@@ -552,6 +607,7 @@ class MCRControl():
             return fw
 
         # get the board SN
+        @MCRInitRequired
         def readBoardSN(self) -> str:
             '''
             Get the serial number of the board. 
@@ -577,6 +633,7 @@ class MCRControl():
             return sn
         
         # communication path
+        @MCRInitRequired
         def setCommunicationPath(self, path:Union[int|str]) -> bool:
             '''
             Set the communication path to I2C (0), USB (1), or UART (2).  
@@ -617,7 +674,8 @@ class MCRControl():
         
         # read/write motor configurations to EEPROM
         # MCRReadConfig
-        def MCRReadMotorSetup(self, id:int) -> tuple:
+        @MCRInitRequired
+        def MCRReadMotorSetup(self, id:int) -> Tuple[bool, int, bool, bool, int, int, int]:
             '''
             Read the configuration of the motor.  The configuration includes: 
             - motor type: stepper (0) or DC (1)
@@ -632,7 +690,7 @@ class MCRControl():
             ### return: 
             [
                 success: True if MCR returned a valid response,
-                motor type: stepper (0) or DC (1), 
+                motor type: stepper (0) | DC (1) | error code (<0) if success is False,
                 use left stop: True/False, 
                 use right stop: True/False, 
                 max steps: maximum number of steps, 
@@ -643,7 +701,7 @@ class MCRControl():
             if id not in [MCR_FOCUS_MOTOR_ID, MCR_ZOOM_MOTOR_ID, MCR_IRIS_MOTOR_ID, MCR_IRC_MOTOR_ID]:
                 log.error("Error: Motor ID not recognized")
                 err.saveError(err.ERR_RANGE, err.MOD_MCR, err.errLine())
-                return False, None, None, None, None, None, None
+                return False, -1, False, False, -1, -1, -1, err.ERR_RANGE
             
             command = bytearray(3)
             command[0] = 0x67
@@ -656,7 +714,7 @@ class MCRControl():
             if response[1] == 0xFF:
                 log.error("Error: controller responded with invalid motor id")
                 err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
-                return False, None, None, None, None, None, None
+                return False, -1, False, False, -1, -1, -1, err.ERR_NO_COMMUNICATION
 
             try:
                 # Parse the response
@@ -677,16 +735,17 @@ class MCRControl():
             except ValueError as e:
                 log.error(f"Failed to parse response: response=[{', '.join([f'{int(x):02X}' for x in response])}] ({e})")
                 err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
-                return False, None, None, None, None, None, None
+                return False, -1, False, False, -1, -1, -1, err.ERR_NO_COMMUNICATION
             
             # combine the MSB and LSB bytes to get values
             maxSteps = (maxStepsMsb << 8) | maxStepsLsb
             minSpeed = (minSpeedMsb << 8) | minSpeedLsb
             maxSpeed = (maxSpeedMsb << 8) | maxSpeedLsb
             
-            return True, int(motorType), bool(useLeftStop), bool(useRightStop), int(maxSteps), int(minSpeed), int(maxSpeed)
+            return True, int(motorType), bool(useLeftStop), bool(useRightStop), int(maxSteps), int(minSpeed), int(maxSpeed), None
 
         # MCRWriteConfig
+        @MCRInitRequired
         def MCRWriteMotorSetup(self, id:int, useLeftStop:bool, useRightStop:bool, maxSteps:int, minSpeed:int, maxSpeed:int) -> bool:
             '''
             Write the configuration of the motor.  This is stored in the controller board memory for each motor and will
@@ -945,7 +1004,14 @@ class MCRControl():
             '''
             # send the string
             if self.debugPrint: log.debug("   -> {}".format(":".join("{:02x}".format(c) for c in cmd)))
-            self.serialPort.write(cmd)
+            try:
+                self.serialPort.write(cmd)
+            except serial.SerialException as e:
+                log.error("Serial port not open {}".format(e))
+                response[0] = 0x74
+                response[1] = 0x01      # not successful
+                response[2] = 0x0D
+                return response
 
             # wait for a response (wait first then check for the response)
             response = bytearray(12)

@@ -21,7 +21,7 @@ MCR.zoomInit(3227, 3119)
 MCR.irisInit(75)
 MCR.IRCInit()
 ```  
-The initialization commands will create instances of the motor class for each motor which can be accessed by focus, zoom, and iris named instances.  There are some board query commands that use the MCRBoard subclass.  This subclass was automatically initilized.  
+The initialization commands will create instances of the motor class for each motor which can be accessed by focus, zoom, and iris named instances.  If the MCRControl class was not successful (possibly due to hardware connection issue) any subsequent functions will return an error value.  There are some board query commands that use the MCRBoard subclass.  This subclass was automatically initilized.  
 
 Now the motors can be controlled individually.  For example, the focus motor can be moved to an absolute step number.  
 ``` 
@@ -42,6 +42,7 @@ The parameters for `focusInit()`, `zoomInit()`, and `irisInit` can be found in t
     - focusInit(9353, 8652)
     - zoomInit(4073, 154)
     - irisInit(75)
+(updated v.2.5.0)
 
 # Important variables
 Each motor has these variables available
@@ -65,4 +66,4 @@ Mark Peterson at Theia Technologies
 [mpeterson@theiatech.com](mailto://mpeterson@theiatech.com)
 
 # Revision
-v.2.4
+v.2.5
