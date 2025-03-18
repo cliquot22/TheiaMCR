@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "TheiaMCR"
-version = "2.5.0"
+version = "3.0.0"
 authors = [
   { name="Mark Peterson", email="mpeterson@theiatech.com" },
 ]
@@ -20,7 +20,11 @@ classifiers = [
   'Programming Language :: Python :: 3',
   'Natural Language :: English',
 ]
-dependencies = ["pyserial"]
+dependencies = [
+  "pyserial", 
+  "logging", 
+  "typing"
+]
 
 [project.urls]
 "Homepage" = "https://github.com/cliquot22/TheiaMCR"

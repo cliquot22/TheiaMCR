@@ -32,6 +32,8 @@ log.info(f'Focus step {MCR.focus.currentStep}')
 
 For the internal IRC switchable filter, the state can be 1 or 2 to match the specification sheet.  Usually filter 1 is visible only transmission and filter 2 is visible + IR transmission.  
 
+When ending the program, call `MCR.close()` to close the serial port and release any resources being used.  
+
 ## Motor limits
 The parameters for `focusInit()`, `zoomInit()`, and `irisInit` can be found in the lens specification.  These are the parameters for some of Theia's lenses.  
 - TL1250 (-N) lens: 
@@ -54,7 +56,8 @@ Each motor has these variables available
 More information about the available functions can be found in the [wiki](https://github.com/cliquot22/TheiaMCR/wiki) pages.   
 
 # Logging
-There are logging commands in the module using Python's logging libray.  These are set by default to log WARNING and higher levels.  To see other log prints, initialize the class with `MCR = TheiaMCR.MCRControl(serial_port="com4", degubLog=True)` or manually set the logging level with `TheiaMCR.log.setLevel(logging.INFO)`.  
+There are logging commands in the module using Python's logging libray.  These are set by default to log WARNING and higher levels.  To see other log prints in the console, initialize the class with `MCR = TheiaMCR.MCRControl(serial_port="com4", degubLog=True)` or manually set the logging level with `TheiaMCR.log.setLevel(logging.INFO)`.    
+The module creates 2 rotating log files in the background by default based on Python's logging module.  If the logging module isn't used, the log files can be disabled by calling `MCR = TheiaMCR.MCRControl(serial_port="com4", logFiles=False)`.  
 
 # License
 Theia Technologies BSD license
@@ -66,4 +69,4 @@ Mark Peterson at Theia Technologies
 [mpeterson@theiatech.com](mailto://mpeterson@theiatech.com)
 
 # Revision
-v.2.5
+v.3.0

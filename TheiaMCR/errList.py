@@ -14,6 +14,7 @@ ERR_RANGE = -69                     # input parameter out of range
 ERR_NOT_INIT = -24                  # Not initialized
 ERR_NO_COMMUNICATION = -31          # no communication/ response from MCR board
 ERR_MOVE_TIMEOUT = -32              # no response before timeout
+ERR_DEPRICATED = -72                # depricated function
 
 # modules
 MOD_MCR = 8                         # MCRControl
@@ -69,7 +70,8 @@ def decipher(errNum):
         ERR_RANGE: 'input parameter out of range', 
         ERR_NOT_INIT: 'Not initialized', 
         ERR_NO_COMMUNICATION: 'no communication/ response from MCR board', 
-        ERR_MOVE_TIMEOUT: 'no response before timeout'
+        ERR_MOVE_TIMEOUT: 'no response before timeout',
+        ERR_DEPRICATED: 'depricated function'
     }
     return errorList[errNum]
 

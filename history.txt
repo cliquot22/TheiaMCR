@@ -2,6 +2,15 @@
 --Time out if no response from comport (MCR not connected to that com port)
 
 # revision history
+v.3.0.0 250311 Added log files with function tracking (debug level)
+                Allowed log files to be created in user's directories for Windows and Linux OS
+                moved motor specific functions to motor class (MCRReadMotorSetup, MCRWriteMotorSetup, and internal functions).  Change MCR.MCRControl.MCRReadMotorSetup() to MCR.focus.readMotorSetup(), etc. 
+                Depricated functions for backward compatibility. 
+                Created a separate MCRCom class for board communication using only one instance for the entire program.   
+                updated instance variables (self.focus, etc) to class variables (MCRControl.focus, etc) since each controller has only one of each motor type. 
+                updated MCRControl.close() function to release resources. 
+                bug (MCRCom._sendCmd): added successful return value when changing protocol between USB, UART, I2C. 
+                
 v.2.5.0 250304 Added MCRInitRequired check for functions
     v.2.4.2 250212 MCRRegardLimits(): check for a valid getCmd() response before creating the setCmd() parameter
     v.2.4.1 250117 (line 575) updated SN for >055-009999
