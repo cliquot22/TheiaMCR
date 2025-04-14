@@ -14,7 +14,6 @@ import time
 import TheiaMCR.errList as err
 import logging
 from os import path
-from typing import Tuple, Union
 import TheiaMCR.rotatingLogFiles as rotLogFiles
 import sys
 
@@ -638,7 +637,7 @@ class MCRControl():
 
         # read/write motor configurations to EEPROM
         # MCRReadConfig
-        def readMotorSetup(self) -> Tuple[bool, int, bool, bool, int, int, int, int]:
+        def readMotorSetup(self) -> tuple[bool, int, bool, bool, int, int, int, int]:
             '''
             Read the configuration of the motor.  The configuration includes: 
             - motor type: stepper (0) or DC (1)
@@ -1072,7 +1071,7 @@ class MCRControl():
             return sn
         
         # communication path
-        def setCommunicationPath(self, path:Union[int|str]) -> bool:
+        def setCommunicationPath(self, path:int|str) -> bool:
             '''
             Set the communication path to I2C (0), USB (1), or UART (2).  
             Once the new path is set, the board will reboot and the existing path will be disabled.  
@@ -1117,7 +1116,7 @@ class MCRControl():
         
         ################### Depricated functions (moved from controllerClass to motor class in v.3.0.0) ###########
         # MCRReadConfig
-        def MCRReadMotorSetup(self, id:int) -> Tuple[bool, int, bool, bool, int, int, int]:
+        def MCRReadMotorSetup(self, id:int) -> tuple[bool, int, bool, bool, int, int, int]:
             '''Depricated MCRReadMotorSetup, use motor class readMotorSetup instead'''
             MCRControl.log.warning('Depricated TheiaMCR.controllerClass.MCRReadMotorSetup, use motor.readMotorSetup instead')
             if id == MCR_FOCUS_MOTOR_ID: retVal = MCRControl.focus.readMotorSetup()

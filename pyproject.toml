@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "TheiaMCR"
-version = "3.1.0"
+version = "3.1.1"
 authors = [
   { name="Mark Peterson", email="mpeterson@theiatech.com" },
 ]
 description = "Theia MCR motor control functions"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.10"
 classifiers = [
   'Development Status :: 5 - Production/Stable',
   'Intended Audience :: Science/Research',
@@ -19,11 +19,11 @@ classifiers = [
   'Programming Language :: Python :: 3',
   'Natural Language :: English',
 ]
-license = { text = "BSD-3-Clause" }
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
 dependencies = [
   "pyserial", 
-  "logging", 
-  "typing"
+  "logging"
 ]
 
 [project.urls]

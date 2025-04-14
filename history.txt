@@ -2,6 +2,7 @@
 --Time out if no response from comport (MCR not connected to that com port)
 
 # revision history
+    v.3.1.1 250414 removed depricated typing module.  Python >3.10 required.  
 v.3.1.0 250320 Log files are appended, not deleted after each restart
                 IRC state moved to motor class 
                 MCRControl class variables moved to instance variables to allow multiple boards to be controlled
