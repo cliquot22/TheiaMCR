@@ -2,14 +2,12 @@
 # A MCR600 series control board must be connected to the Windows comptuer via USB.  Set the
 # virtual comport name in the variable 'comport'
 
-#import TheiaMCR as mcr     # also change __init__.py file to import the module as TheiaMCR
-import TheiaMCR.TheiaMCR as mcr
+import TheiaMCR as mcr
+#import TheiaMCR.TheiaMCR as mcr  # use for local development
 import logging
 import time
+import os
 import serial.tools.list_ports
-
-log = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format='%(levelname)-7s ln:%(lineno)-4d %(module)-18s  %(message)s')
 
 def searchComPorts():
     '''
@@ -20,12 +18,16 @@ def searchComPorts():
     ports = serial.tools.list_ports.comports()
     portList = []
     for port, desc, hwid in sorted(ports):
-        log.info("Ports: {} [{}]".format(desc, hwid))
-        portList.append(port)
+        if ((os.name == 'posix') and (hwid != 'n/a')):
+            log.info("Ports: {} [{}]".format(desc, hwid))
+            portList.append(port)
+        elif os.name == 'nt':
+            log.info("Ports: {} [{}]".format(desc, hwid))
+            portList.append(port)
     log.info(f'Port list: {portList}')
     return portList
 
-def init(comport:str, lensType:str='TL1250'):
+def init(comport:str, lensType:str='TL1250', moduleDebugLevel=False, communicationDebugLevel=False, logFiles=True):
     '''
     Example: initialize the motor control board.  This will open the com port and send a test command to the board.  
     The board response should be the firmware revision.  
@@ -33,13 +35,16 @@ def init(comport:str, lensType:str='TL1250'):
     ### input:  
     - comport: com port string ('com4' for example)
     - lensType: lens model [TL410 | TL1250]
+    - moduleDebugLevel: (optional:False) to see debug level logging from the MCR module
+    - communicationDebugLevel: (optional:False) to see debug level logging from the MCR module
+    - logFiles: (optional:True) to create a log file in the AppData/Local/TheiaMCR/log directory
     ### return:  
     - handle to the MCR class
     '''
     # create the motor control board instance
     log.info('Initializing MCR board')
-    MCR = mcr.MCRControl(serialPort=comport, moduleDebugLevel=True, communicationDebugLevel=False, logFiles=True)  # defaults: False, False, True
-    log.info('Response in the form: "FW revision: #.#.#.#.#"')
+    MCR = mcr.MCRControl(serialPortName=comport, moduleDebugLevel=moduleDebugLevel, communicationDebugLevel=communicationDebugLevel, logFiles=logFiles)
+    log.info('Response (above) in the form: "FW revision: #.#.#.#.#"')
     
     # initialize the motors
     if 'TL1250' in lensType:
@@ -52,6 +57,8 @@ def init(comport:str, lensType:str='TL1250'):
         MCR.zoomInit(steps=4073, pi=154)
     MCR.irisInit(75)
     MCR.IRCInit()
+    log.info(f'MCR initialized ({MCR.MCRInitialized}) for logging')
+    log.info(f'MCR board initialized: {MCR.boardInitialized}')
     time.sleep(1)
     return MCR
 
@@ -71,7 +78,7 @@ def motorConfiguration(comport:str, lensType:str='TL1250'):
     setMinSpeed = 200
     setMaxSpeed = 1200
     log.info(f'Write motor configuration: use stops: (True,False), max steps: {setMaxSteps}, speed range: ({setMinSpeed},{setMaxSpeed})')
-    success = MCR.zoom.writeMotorSetup(useLeftStop=True, useRightStop=False, maxSteps=setMaxSteps, minSpeed=setMinSpeed, maxSpeed=setMaxSpeed)
+    success = MCR.zoom.writeMotorSetup(useWideFarStop=True, useTeleNearStop=False, maxSteps=setMaxSteps, minSpeed=setMinSpeed, maxSpeed=setMaxSpeed)
     log.info(f'Configuration written result: {success}')
     time.sleep(0.5)
 
@@ -119,7 +126,7 @@ def moveMotorsExample(comport:str, lensType:str='TL1250'):
 
     # switch the IRC
     log.info('Setting IRC state')
-    MCR.IRCState(1)
+    MCR.IRC.state(1)
     time.sleep(1)
 
     # reset
@@ -128,7 +135,7 @@ def moveMotorsExample(comport:str, lensType:str='TL1250'):
     log.info('Open iris')
     MCR.iris.home()
     log.info('Reset IRC state')
-    MCR.IRCState(0)
+    MCR.IRC.state(0)
     log.info('Focus and zoom remain at their set positions')
 
 def limits(comport:str, lensType:str='TL1250'):
@@ -185,7 +192,7 @@ def close(comport:str):
     MCR = init(comport)
     log.info('Closing down')
     MCR.close()
-    log.info('Resources released, this should give an error:')
+    log.info('Resources released, this should give an ERROR:')
     try: 
         MCR.MCRBoard.readBoardSN()
     except:
@@ -248,15 +255,59 @@ def changeComPathExample(comport:str):
 
 
 if __name__ == '__main__':
-    #searchComPorts()
-    comport = 'com4'
-    #init(comport, 'TL1250')
-    #motorConfiguration(comport)
-    moveMotorsExample(comport, 'TL1250')
-    #limits(comport, 'TL1250')
-    #closeLogFile(comport, 'TL1250')
-    #close(comport)
+    log = logging.getLogger(__name__)
+    logging.basicConfig(level=logging.DEBUG, format='%(levelname)-7s ln:%(lineno)-4d %(module)-18s  %(message)s')
+
+    # lens types
+    lensTypes = ['TL410', 'TL1250']
+    # test selection
+    # 1: search com ports and list all connected devices
+    # 2: initialize the board and motors
+    # 3: read and write a motor configuration (steps, speed, etc.)
+    # 4: move motors
+    # 5: turn off PI limit to show moving past PI position
+    # 6: close the background logging file 
+    # 7: close and release resources before exiting a program
+    # 8: (low level) show the byte string communications back and forth to the board 
+    # 9: change the input protocol from USB to UART or I2C 
+    
+    runTest = [2,4]   ### select the test numbers to run (can be multiple)
+    lensType = 1    # 0: 'TL410', 1: 'TL1250'
+    
+    if os.name == 'nt':
+        comport = 'com4'
+    else:
+        comport = '/dev/ttyUSB0'
+        # in Lunux make sure there is permission to access the port (sudo usermod -a -G dialout $USER)
+    if 0 in runTest or len(runTest) == 0:
+        log.info('Set the test numbers in the variable "runTest"')
+    if 1 in runTest:
+        log.info('1: search com ports and list all connected devices')
+        searchComPorts()
+    if 2 in runTest:
+        log.info('2: initialize the board and motors')
+        init(comport, lensTypes[lensType], moduleDebugLevel=False)
+    if 3 in runTest:
+        log.info('3: read and write a motor configuration (steps, speed, etc.)')
+        motorConfiguration(comport)
+    if 4 in runTest:
+        log.info('4: move motors')
+        moveMotorsExample(comport, lensTypes[lensType])
+    if 5 in runTest:
+        log.info('5: turn off PI limit to show moving past PI position')
+        limits(comport, lensTypes[lensType])
+    if 6 in runTest:
+        log.info('6: close the background logging file')
+        closeLogFile(comport, lensTypes[lensType])
+    if 7 in runTest:
+        log.info('7: close and release resources before exiting a program')
+        close(comport)
 
     ##### special demonstration functions ######
-    #viewCommunications(comport)
-    #changeComPathExample(comport)
+    if 8 in runTest:
+        log.info('8: (low level) show the byte string communications back and forth to the board')
+        viewCommunications(comport)
+    if 9 in runTest:
+        log.info('9: change the input protocol from USB to UART or I2C')
+        changeComPathExample(comport)
+    log.info('Done')

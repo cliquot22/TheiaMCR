@@ -164,6 +164,6 @@ if __name__ == '__main__':
     comport = 'com4'
     #init(comport)
 
-    #motorConfigurationDepricated(comport)
-    moveMotorsDepricated(comport)
+    motorConfigurationDepricated(comport)
+    #moveMotorsDepricated(comport)
     #changeComPathExample(comport)

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "TheiaMCR"
-version = "3.0.0"
+version = "3.1.0"
 authors = [
   { name="Mark Peterson", email="mpeterson@theiatech.com" },
 ]
@@ -15,11 +15,11 @@ classifiers = [
   'Development Status :: 5 - Production/Stable',
   'Intended Audience :: Science/Research',
   'Intended Audience :: Manufacturing',
-  'License :: OSI Approved :: BSD License',  
   'Operating System :: Microsoft :: Windows',
   'Programming Language :: Python :: 3',
   'Natural Language :: English',
 ]
+license = { text = "BSD-3-Clause" }
 dependencies = [
   "pyserial", 
   "logging", 

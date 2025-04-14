@@ -59,6 +59,8 @@ More information about the available functions can be found in the [wiki](https:
 There are logging commands in the module using Python's logging libray.  These are set by default to log WARNING and higher levels.  To see other log prints in the console, initialize the class with `MCR = TheiaMCR.MCRControl(serial_port="com4", degubLog=True)` or manually set the logging level with `TheiaMCR.log.setLevel(logging.INFO)`.    
 The module creates 2 rotating log files in the background by default based on Python's logging module.  If the logging module isn't used, the log files can be disabled by calling `MCR = TheiaMCR.MCRControl(serial_port="com4", logFiles=False)`.  
 
+Unhandled exceptions are logged to the log file using the `sys.excepthook` variable.  This is a global variable so check the operation within your application if you set this variable elsewhere.  
+
 # License
 Theia Technologies BSD license
 Copyright 2023-2025 Theia Technologies
@@ -69,4 +71,4 @@ Mark Peterson at Theia Technologies
 [mpeterson@theiatech.com](mailto://mpeterson@theiatech.com)
 
 # Revision
-v.3.0
+v.3.1

@@ -8,6 +8,7 @@ finalError = []
 # error formatted lists are of the form [err code, module, line]
 
 # error codes
+ERR_OK = 0                          # OK, no error
 ERR_BAD_MOVE = -62                  # MCR move returned unsuccessful
 ERR_SERIAL_PORT = -64               # serial port not open
 ERR_RANGE = -69                     # input parameter out of range
@@ -15,6 +16,7 @@ ERR_NOT_INIT = -24                  # Not initialized
 ERR_NO_COMMUNICATION = -31          # no communication/ response from MCR board
 ERR_MOVE_TIMEOUT = -32              # no response before timeout
 ERR_DEPRICATED = -72                # depricated function
+ERR_NOT_SUPPORTED = -73             # function not supported (i.e. for this motor)
 
 # modules
 MOD_MCR = 8                         # MCRControl
@@ -65,13 +67,15 @@ def decipher(errNum):
     
     errorList = {
         # error codes
+        ERR_OK: 'No error',
         ERR_BAD_MOVE: 'MCR move returned unsuccessful', 
         ERR_SERIAL_PORT: 'serial port not open', 
         ERR_RANGE: 'input parameter out of range', 
         ERR_NOT_INIT: 'Not initialized', 
         ERR_NO_COMMUNICATION: 'no communication/ response from MCR board', 
         ERR_MOVE_TIMEOUT: 'no response before timeout',
-        ERR_DEPRICATED: 'depricated function'
+        ERR_DEPRICATED: 'depricated function',
+        ERR_NOT_SUPPORTED: 'function not supported (i.e. for this motor)'
     }
     return errorList[errNum]
 
