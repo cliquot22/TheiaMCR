@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "TheiaMCR"
-version = "3.1.1"
+version = "3.1.2"
 authors = [
   { name="Mark Peterson", email="mpeterson@theiatech.com" },
 ]
