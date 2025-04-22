@@ -2,6 +2,8 @@
 --Time out if no response from comport (MCR not connected to that com port)
 
 # revision history
+    v.3.1.4 250422 bug: reverted to hard coded revision in the file. 
+    v.3.1.3 250422 bug: read revision from pyproject.toml file when .exe is created
     v.3.1.2 250421 read revision from pyproject.toml file rather than setting manually in the module. 
     v.3.1.1 250414 removed depricated typing module.  Python >3.10 required.  
 v.3.1.0 250320 Log files are appended, not deleted after each restart

@@ -24,12 +24,8 @@ log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
 # internal constants used across the classes in this module.  
-# read revision from pyproject.toml file
-MCR_REVISION = 'v.0.0.0'
-pyprojectPath = Path(__file__).parent.parent / 'pyproject.toml'
-with open(pyprojectPath, 'rb') as f:
-    pyproject = tomllib.load(f)
-    MCR_REVISION = f'v.{pyproject['project']['version']}'
+MCR_REVISION = 'v.3.1.4'
+
 RESPONSE_READ_TIME = 500                # (ms) max time for the MCR to post a response in the buffer
 MCR_FOCUS_MOTOR_ID = 0x01               # motor ID's as specified in the motor control documentation
 MCR_ZOOM_MOTOR_ID = 0x02
