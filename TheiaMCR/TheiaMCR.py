@@ -16,8 +16,6 @@ import logging
 from os import path
 import TheiaMCR.rotatingLogFiles as rotLogFiles
 import sys
-from pathlib import Path
-import tomllib
 
 # create a logger instance for this module
 log = logging.getLogger(__name__)
@@ -437,18 +435,20 @@ class MCRControl():
                 self.setRespectLimits(True)
             
             # move the motor to expected PI position (110% of max steps)
-            success = self._motorMove(steps=(self.maxSteps * 1.1) * self.PISide, speed=max(self.currentSpeed, MCR_FZ_HOME_SPEED), acceleration=self.acceleration)
+            homeSpeed = MCR_FZ_HOME_SPEED if self.motorID in MCR_FOCUS_ZOOM_MOTORS_IDS else MCR_IRIS_DEFAULT_SPEED
+            homeApproachSpeed = MCR_FZ_APPROACH_SPEED if self.motorID in MCR_FOCUS_ZOOM_MOTORS_IDS else MCR_IRIS_DEFAULT_SPEED
+            success = self._motorMove(steps=(self.maxSteps * 1.1) * self.PISide, speed=max(self.currentSpeed, homeSpeed), acceleration=self.acceleration)
             if self.motorID == 0x01 or self.motorID == 0x02:
                 # confirm the motor is at the PI and not past the PI position, move the difference between max steps and PI position + 40 steps over the expected (max - PIStep) to be sure since the physical max step is variable.  
                 piCheckSteps = (self.PIStep - self.maxSteps) if self.PISide == 1 else self.PIStep
                 time.sleep(MCR_MOVE_REST_TIME)
                 # move away from PI at full speed
-                self._motorMove(steps=(piCheckSteps - self.PISide * MCR_HARDSTOP_TOLERANCE), speed=max(self.currentSpeed, MCR_FZ_HOME_SPEED), acceleration=self.acceleration)
+                self._motorMove(steps=(piCheckSteps - self.PISide * MCR_HARDSTOP_TOLERANCE), speed=max(self.currentSpeed, homeSpeed), acceleration=self.acceleration)
                 time.sleep(MCR_MOVE_REST_TIME)
                 # move back, towards PI at full speed but not all the way
-                self._motorMove(steps=-piCheckSteps + self.PISide * (MCR_HARDSTOP_TOLERANCE - 50), speed=max(self.currentSpeed, MCR_FZ_HOME_SPEED), acceleration=self.acceleration)
+                self._motorMove(steps=-piCheckSteps + self.PISide * (MCR_HARDSTOP_TOLERANCE - 50), speed=max(self.currentSpeed, homeSpeed), acceleration=self.acceleration)
                 # slow down and hit PI at slower speed
-                success = self._motorMove(steps=self.PISide * 100, speed=MCR_FZ_APPROACH_SPEED, acceleration=self.acceleration)
+                success = self._motorMove(steps=self.PISide * 100, speed=homeApproachSpeed, acceleration=self.acceleration)
 
             # reset the respect limit state
             if setIgnoreLimitsToFalse: self.setRespectLimits(False)

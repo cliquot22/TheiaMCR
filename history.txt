@@ -2,6 +2,7 @@
 --Time out if no response from comport (MCR not connected to that com port)
 
 # revision history
+    v.3.1.5 250423 bug: changed iris initial home speed (motor:iris:home)
     v.3.1.4 250422 bug: reverted to hard coded revision in the file. 
     v.3.1.3 250422 bug: read revision from pyproject.toml file when .exe is created
     v.3.1.2 250421 read revision from pyproject.toml file rather than setting manually in the module. 
