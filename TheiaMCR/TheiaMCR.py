@@ -4,6 +4,7 @@
 # The board must be initizlized first using the MCRControl __init__ function.  Then the motors must
 # all be initialize with their steps and limit positions.  The init commands will create instances
 # of the motor class for each motor.  
+# See more information at https://github.com/cliquot22/TheiaMCR  
 #
 # (c) 2023-2025 Theia Technologies
 # www.TheiaTech.com
@@ -16,13 +17,20 @@ import logging
 from os import path
 import TheiaMCR.rotatingLogFiles as rotLogFiles
 import sys
+from pathlib import Path
+import tomllib
 
 # create a logger instance for this module
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
 # internal constants used across the classes in this module.  
-MCR_REVISION = 'v.3.1.4'
+# cosntants (read revision from pyproject.toml)
+MCR_REVISION = None
+pyprojectPath = Path(__file__).parent.parent / 'pyproject.toml'
+with open(pyprojectPath, 'rb') as f:
+    pyproject = tomllib.load(f)
+    MCR_REVISION = pyproject['project']['version']
 
 RESPONSE_READ_TIME = 500                # (ms) max time for the MCR to post a response in the buffer
 MCR_FOCUS_MOTOR_ID = 0x01               # motor ID's as specified in the motor control documentation
@@ -113,10 +121,13 @@ class MCRControl():
         - irisInit(self, steps:int, move:bool=True) -> bool
         - IRCInit(self) -> bool
         - close(self)   # call this function to close the serial port and release the resources
+        - checkBoardCommunication(self) -> bool   # confirm the com port is still open and communication with the board is possible
         ### class variables
         - MCRInitialized: set to True when the class is successfully initialized (with regard to logging)
         ### instance variables  
-        - boardInitialized: set to True with this instance of the class (this board) is initialized
+        - boardInitialized: set to True with this instance of the class (this board) is initialized and com port is open
+        - boardCommunicationState: set to True (in MCRCom._sendCmd()) when the board communication is successful
+        - boardCommunicationRestarts: counts the number of times communication with the board has been restarted
         ### Sub-classes: 
         - motor
         - controllerClass
@@ -130,7 +141,10 @@ class MCRControl():
             return
         
         self.boardInitialized = False
+        self.boardCommunicationState = False
+        self.boardCommunicationRestarts = 0
         self.serialPort = None
+        self.serialPortName = serialPortName
         
         MCRControl.communicationDebugLevel = communicationDebugLevel
         if communicationDebugLevel: moduleDebugLevel = True
@@ -153,6 +167,8 @@ class MCRControl():
                 MCRControl.log.error("Error: No resonse received from MCR controller")
                 err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
                 success = err.ERR_NO_COMMUNICATION
+            else:
+                self.boardCommunicationState = True
         self.boardInitialized = True if success >= 0 else False        # set initialization state
 
         # ultimate success
@@ -276,6 +292,17 @@ class MCRControl():
         if self.consoleLogHandler: 
             self.consoleLogHandler.close()
             self.consoleLogHandler = None
+
+    # check and reopen board communication via serial port
+    def checkBoardCommunication(self) -> bool:
+        '''
+        Check the communication with the MCR board.  If the communication is not successful, 
+        attempt to restart the serial port.  Check communication again and return the result.  
+        ### return:  
+        - True if the communication is successful, False otherwise.
+        '''
+        boardCommunication = self.com._verifyCommunication()
+        return boardCommunication
     
     ############ internal functions ##############################################################
     # set up logging 
@@ -692,8 +719,14 @@ class MCRControl():
                 ) = response
             except ValueError as e:
                 MCRControl.log.error(f"Failed to parse read motor values response [{', '.join([f'{int(x):02X}' for x in response])}] ({e})")
-                err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
-                return False, -1, False, False, -1, -1, -1, err.ERR_NO_COMMUNICATION
+                if self.parent.boardCommunicationState:
+                    # no response or incorrect response from the board
+                    err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
+                    return False, -1, False, False, -1, -1, -1, err.ERR_NO_COMMUNICATION
+                else:
+                    # serial port communication is not initialized
+                    err.saveError(err.ERR_SERIAL_PORT, err.MOD_MCR, err.errLine())
+                    return False, -1, False, False, -1, -1, -1, err.ERR_SERIAL_PORT
             
             # combine the MSB and LSB bytes to get values
             maxSteps = (maxStepsMsb << 8) | maxStepsLsb
@@ -739,7 +772,12 @@ class MCRControl():
             # check the response
             if response[1] != 0x00:
                 MCRControl.log.error("Error: Write motor values failed")
-                err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
+                if self.parent.boardCommunicationState:
+                    # no response or incorrect response from the board
+                    err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
+                else:
+                    # serial port communication is not initialized
+                    err.saveError(err.ERR_SERIAL_PORT, err.MOD_MCR, err.errLine())
                 return False
             return True
 
@@ -858,7 +896,10 @@ class MCRControl():
             success = True
             if response[1] == 0x01:
                 MCRControl.log.error("Error: Motor init failed")
-                err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
+                if self.parent.boardCommunicationState:
+                    err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
+                else:
+                    err.saveError(err.ERR_SERIAL_PORT, err.MOD_MCR, err.errLine())
                 success = False
             return success
         
@@ -866,8 +907,12 @@ class MCRControl():
         def _motorMove(self, steps:int, speed:int, acceleration:int=0) -> bool:
             '''
             Send the move command byte string. 
-            Move the motor by a number of steps
-            (NOTE: Iris step direction for MCR is reversed (0x66(+) is iris closed) so invert step direction before moving)
+            Move the motor by a number of steps.  
+            (NOTE: Iris step direction for MCR is reversed (0x66(+) is iris closed) so invert step direction before moving).  
+            
+            If the move failed, check self.parent.boardCommunicationState to see if the board is still connected.  
+            If communication is still active, consider redoing the move command or reinitializing the motor.  
+
             Command byte array: 
             [move cmd, motor ID, steps (2), start, speed (2), CR]
             ### input: 
@@ -921,8 +966,16 @@ class MCRControl():
             success = True
             if response[1] != 0x00:
                 MCRControl.log.error("Error: move motor failed")
-                err.saveError(err.ERR_MOVE_TIMEOUT, err.MOD_MCR, err.errLine())
+
+                # check the board is still connected and communication is possible.  
+                MCRControl.log.warning('Rechecking MCR board communication...')
+                boardCommunication = self.com._verifyCommunication()
+                MCRControl.log.warning(f'...Communication with MCR board {"re-established" if boardCommunication else "failed"}')
+
+                if not self.parent.boardCommunicationState:
+                    err.saveError(err.ERR_SERIAL_PORT, err.MOD_MCR, err.errLine())
                 success = False
+
             return success
 
         # MCRRegardLimits
@@ -955,6 +1008,10 @@ class MCRControl():
             if len(res) == 0: 
                 # no response from board for current state
                 MCRControl.log.warning("Warning: no response from MCR board")
+                if self.parent.boardCommunicationState:
+                    err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
+                else:
+                    err.saveError(err.ERR_SERIAL_PORT, err.MOD_MCR, err.errLine())
                 return False
             # exctract the proper response if the variable res includes more than one response
             for i in range(len(res)):
@@ -963,6 +1020,10 @@ class MCRControl():
                     break
             if len(res) > 12: 
                 MCRControl.log.warning("Warning: MCR board response too long ({})".format(":".join("{:02x}".format(c) for c in res)))
+                if self.parent.boardCommunicationState:
+                    err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
+                else:
+                    err.saveError(err.ERR_SERIAL_PORT, err.MOD_MCR, err.errLine())
                 return False
             setCmd = bytearray(12)
             for i, b in enumerate(res):
@@ -985,7 +1046,10 @@ class MCRControl():
 
             if response[1] != 0x00:
                 MCRControl.log.error("Error: write motor configuration failed")
-                err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
+                if self.parent.boardCommunicationState:
+                    err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
+                else:
+                    err.saveError(err.ERR_SERIAL_PORT, err.MOD_MCR, err.errLine())
                 return False
             return True
 
@@ -1037,7 +1101,10 @@ class MCRControl():
             fw = ''
             if response == None:
                 MCRControl.log.error("Error: No resonse received from MCR controller")
-                err.saveError(err.ERR_SERIAL_PORT, err.MOD_MCR, err.errLine())
+                if self.parent.boardCommunicationState:
+                    err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
+                else:
+                    err.saveError(err.ERR_SERIAL_PORT, err.MOD_MCR, err.errLine())
             else:
                 fw = (".".join("{:x}".format(c) for c in response))
                 fw = fw[3:-2]
@@ -1065,7 +1132,10 @@ class MCRControl():
             sn = ''
             if response == None:
                 MCRControl.log.error("Error: No resonse received from MCR controller")
-                err.saveError(err.ERR_SERIAL_PORT, err.MOD_MCR, err.errLine())
+                if self.parent.boardCommunicationState:
+                    err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
+                else:
+                    err.saveError(err.ERR_SERIAL_PORT, err.MOD_MCR, err.errLine())
             else:
                 sn = f'{response[1]:02x}{response[2]:02x}'
                 sn = sn[:-1]
@@ -1173,8 +1243,8 @@ class MCRControl():
             '''
             This class controlls the serial port and sends user commands to the MCR600 series board over USB serial protocol.  
             The controller board class variable 'serialPort' must be set before any functions are available. 
-            The serial port name is formatted as a Windows vitual com port ("com4")
-        
+            The serial port name is formatted as a vitual com port ("com4" or "/dev/ttyUSB0")
+
             ### input:  
             - parent: the parent MCRControl class instance so all communications go through the same serial port 
             - serialPort: (optional) the serial port name ("com4") to use for communication
@@ -1182,9 +1252,11 @@ class MCRControl():
             - initialized (int): 0: initialized | error code (<0) if not successful
             ### global variables:  
             - serialPort is set at the MCRControl class level
+            - boardCommunicationState: push the serial port state up to MCRControl class.  True if the serial port is open and communication is possible, False otherwise
             '''
             self.parent = parent
             self.serialPort = None
+            self.parent.boardCommunicationState = False
             if self.parent.serialPort is None:
                 try:
                     self.serialPort = serial.Serial(
@@ -1201,7 +1273,38 @@ class MCRControl():
                     err.saveError(err.ERR_SERIAL_PORT, err.MOD_MCR, err.errLine())
                     success = err.ERR_SERIAL_PORT
                 self.initialized = success
+
+        # verify communication
+        def _verifyCommunication(self) -> bool:
+            ''' 
+            Verify communication with the MCR board by calling the readFWRevision function and reading the result.  
+            If the verification fails, try to reinitialize the serial port.
+            Always refer to the parent serial port and port name to make sure it is the correct instance for the port.  
+            '''
+            # Send a command to read the firmware revision
+            cmd = bytearray([0x76, 0x0D])
+            response = self._sendCmd(cmd)
+
+            if response[1] == 0x00:
+                MCRControl.log.error(f"MCR communication verified: {':'.join(f'{b:02x}' for b in response)}")
+                return True
             
+            # Attempt to reinitialize the serial port
+            if self.parent.serialPort is not None:
+                try:
+                    self.parent.serialPort.close()
+                except Exception as e:
+                    MCRControl.log.error(f"Failed to close serial port: {e}")
+                    return False
+
+            # Attempt to reopen the serial port
+            self.parent.serialPort = None
+            self.restartCom = self.parent.MCRCom(self.parent, self.parent.serialPortName)
+            if self.restartCom.initialized >= 0: 
+                self.parent.serialPort = self.restartCom.serialPort
+                self.parent.boardCommunicationRestarts += 1
+            return self.restartCom.initialized == 0
+
         # MCRSendCmd
         def _sendCmd(self, cmd, waitTime:int=10) -> bytearray:
             '''
@@ -1213,25 +1316,25 @@ class MCRControl():
             - waitTime (optional): (ms) wait before checking for a response
             ### return: 
             [return byte string from MCR]
+            ### globals:  
+            - set self.parent.boardCommunicationState to True if the serial port is open and communication is possible, False otherwise
             '''
             response = bytearray(12)
             # check if the serial port is defined
             if isinstance(self.parent.serialPort, str):
                 MCRControl.log.error("Serial port not open")
-                response[0] = 0x74
-                response[1] = 0x01      # not successful
-                response[2] = 0x0D
+                response = bytearray([0x74, 0x01, 0x0D])
+                self.parent.boardCommunicationState = False
                 return response
 
             # send the string
             if MCRControl.communicationDebugLevel: MCRControl.log.debug("   -> {}".format(":".join("{:02x}".format(c) for c in cmd)))
             try:
                 self.parent.serialPort.write(cmd)
-            except serial.SerialException as e:
-                MCRControl.log.error("Serial port not open {}".format(e))
-                response[0] = 0x74
-                response[1] = 0x01      # not successful
-                response[2] = 0x0D
+            except (serial.SerialException, AttributeError) as e:
+                MCRControl.log.error("Serial port not open ({})".format(e))
+                response = bytearray([0x74, 0x01, 0x0D])
+                self.parent.boardCommunicationState = False
                 return response
 
             # wait for a response (wait first then check for the response)
@@ -1239,38 +1342,51 @@ class MCRControl():
             startTime = time.time() * 1000
             while(time.time() * 1000 - waitTime < startTime): 
                 # wait until finished moving (waitTime milliseconds) or until PI triggers serial port buffer response
-                if self.parent.serialPort.in_waiting > 0: break
+                try:
+                    if self.parent.serialPort.in_waiting > 0: 
+                        break
+                except serial.SerialException as e:
+                    MCRControl.log.error("Serial port connection lost {}".format(e))
+                    response = bytearray([0x74, 0x01, 0x0D])
+                    self.parent.boardCommunicationState = False
+                    return response
                 time.sleep(0.1)
 
             # check for commands that don't generate responses, force successful response
             if cmd[0] == 0x6B:
                 # set communication path
-                response[0] = 0x6B
-                response[1] = 0x00
-                response[2] = 0x0D
+                response = bytearray([0x6B, 0x00, 0x0D])
+                self.parent.boardCommunicationState = True
                 return response
+            ##### additional commands can be added here #####
 
             # read the response
             startTime = time.time() * 1000
             while (time.time() * 1000 - RESPONSE_READ_TIME < startTime): 
                 # Wait until there is data waiting in the serial buffer
-                if (self.parent.serialPort.in_waiting > 0):
-                    # Read data out of the buffer until a carraige return / new line is found or until 12 bytes are read
-                    response = self.parent.serialPort.readline()
-                    readSuccess = True
-                    break
-                else:
-                    time.sleep(0.1)
+                try:
+                    if (self.parent.serialPort.in_waiting > 0):
+                        # Read data out of the buffer until a carraige return / new line is found or until 12 bytes are read
+                        response = self.parent.serialPort.readline()
+                        readSuccess = True
+                        break
+                except serial.SerialException as e:
+                    MCRControl.log.error("Serial port connection lost {}".format(e))
+                    response = bytearray([0x74, 0x01, 0x0D])
+                    self.parent.boardCommunicationState = False
+                    return response
+                time.sleep(0.1)
 
             if not readSuccess:
                 # timed out
-                response[0] = 0x74
-                response[1] = 0x01      # not successful
-                response[2] = 0x0D
                 MCRControl.log.warning("MCR send command timed out without response")
+                response = bytearray([0x74, 0x01, 0x0D])
+                self.parent.boardCommunicationState = False
+                return response
 
             # return response
             if MCRControl.communicationDebugLevel: MCRControl.log.debug("  <- None") if response == None else MCRControl.log.debug("   <- {}".format(":".join("{:02x}".format(c) for c in response)))
+            self.parent.boardCommunicationState = True
             return response
         
 if __name__ == "__main__":

@@ -271,11 +271,11 @@ if __name__ == '__main__':
     # 8: (low level) show the byte string communications back and forth to the board 
     # 9: change the input protocol from USB to UART or I2C 
     
-    runTest = [2]   ### select the test numbers to run (can be multiple)
+    runTest = [1, 2]   ### select the test numbers to run (can be multiple)
     lensType = 1    # 0: 'TL410', 1: 'TL1250'
     
     if os.name == 'nt':
-        comport = 'com4'
+        comport = 'COM9'
     else:
         comport = '/dev/ttyUSB0'
         # in Lunux make sure there is permission to access the port (sudo usermod -a -G dialout $USER)
