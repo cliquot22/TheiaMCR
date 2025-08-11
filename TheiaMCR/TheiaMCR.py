@@ -959,7 +959,7 @@ class MCRControl():
             cmd[6] = bSpeed[1]
 
             # send the command
-            waitTime = int((steps * 1050) / speed)  # add 5% to accont for slightly slow speed compared to set speed (noticed error on 8000 steps)
+            waitTime = int((steps / speed) * 1000 * 1.15)  # add 15% to accont for slightly slow speed compared to set speed (noticed error on 8000 steps)
             response = bytearray(12)
             response = self.com._sendCmd(cmd, waitTime)
 
