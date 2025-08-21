@@ -17,15 +17,13 @@ import logging
 from os import path
 import TheiaMCR.rotatingLogFiles as rotLogFiles
 import sys
-from pathlib import Path
-import tomllib
 
 # create a logger instance for this module
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
 # internal constants used across the classes in this module.  
-MCR_REVISION = 'v.3.2.2'
+MCR_REVISION = 'v.3.3.0'
 
 RESPONSE_READ_TIME = 500                # (ms) max time for the MCR to post a response in the buffer
 MCR_FOCUS_MOTOR_ID = 0x01               # motor ID's as specified in the motor control documentation
@@ -376,6 +374,7 @@ class MCRControl():
             - initialized
             - currentStep
             - currentSpeed
+            - homingSpeed
             - PIStep (step position of the photo interrupter limit switch)
             - maxSteps
             - respectLimits (set True to prevent motor from exceeding limits)
@@ -401,6 +400,7 @@ class MCRControl():
             speedRange = 0
             if self.motorID in MCR_FOCUS_ZOOM_MOTORS_IDS:
                 self.currentSpeed = MCR_FZ_DEFAULT_SPEED
+                self.homingSpeed = MCR_FZ_HOME_SPEED
                 speedRange = 1
             elif self.motorID == MCR_IRIS_MOTOR_ID:
                 self.currentSpeed = MCR_IRIS_DEFAULT_SPEED
@@ -457,7 +457,7 @@ class MCRControl():
                 self.setRespectLimits(True)
             
             # move the motor to expected PI position (110% of max steps)
-            homeSpeed = MCR_FZ_HOME_SPEED if self.motorID in MCR_FOCUS_ZOOM_MOTORS_IDS else MCR_IRIS_DEFAULT_SPEED
+            homeSpeed = self.homingSpeed if self.motorID in MCR_FOCUS_ZOOM_MOTORS_IDS else MCR_IRIS_DEFAULT_SPEED
             homeApproachSpeed = MCR_FZ_APPROACH_SPEED if self.motorID in MCR_FOCUS_ZOOM_MOTORS_IDS else MCR_IRIS_DEFAULT_SPEED
             success = self._motorMove(steps=(self.maxSteps * 1.1) * self.PISide, speed=max(self.currentSpeed, homeSpeed), acceleration=self.acceleration)
             if self.motorID == 0x01 or self.motorID == 0x02:
@@ -647,7 +647,6 @@ class MCRControl():
                 err_range, out of acceptable range 
             ]
             '''
-            MCRControl.log.debug(f'_speed,{self.motorID},{speed}')
             if self.motorID in {MCR_FOCUS_MOTOR_ID, MCR_ZOOM_MOTOR_ID}:
                 if speed > 1500 or speed < 100:
                     MCRControl.log.warning(f'Requested speed {speed} is outside range 100-1500')
@@ -658,6 +657,30 @@ class MCRControl():
                     return err.ERR_RANGE
             self.currentSpeed = speed
             MCRControl.log.debug(f'_finalSpeed,{self.motorID},,{self.currentSpeed}')
+            return err.ERR_OK
+
+        # setHomingSpeed
+        def setHomingSpeed(self, speed) -> int:
+            '''
+            Set the motor speed used when seaking the photointerrupter home position for focus/zoom motors.  This is not 
+            applicable to the iris motor.  
+            This is not stored on the board (only in this module) but it should be in the speed range stored on the board EEPROM.  
+            ### input: 
+            - speed: speed to set [pps]
+            ### globals: 
+            - set homingSpeed
+            ### return: 
+            [
+                OK = 0 |
+                err_range, out of acceptable range 
+            ]
+            '''
+            if self.motorID in {MCR_FOCUS_MOTOR_ID, MCR_ZOOM_MOTOR_ID}:
+                if speed > 1500 or speed < 100:
+                    MCRControl.log.warning(f'Requested speed {speed} is outside range 100-1500')
+                    return err.ERR_RANGE
+            self.homingSpeed = speed
+            MCRControl.log.debug(f'_homingSpeed,{self.motorID},,{self.homingSpeed}')
             return err.ERR_OK
 
         # read/write motor configurations to EEPROM

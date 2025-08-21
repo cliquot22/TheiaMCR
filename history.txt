@@ -2,6 +2,7 @@
 --Time out if no response from comport (MCR not connected to that com port)
 
 # revision history
+v.3.3.0 250820 added adjustable homing speed (from default 1200) 
     v.3.2.2 250811 bug: (same as 3.1.4) reverted to hard coded version rather than reading from pyproject.toml 
     v.3.2.1 250811 Changed motor move waitTime slop from 5% to 15%
 v.3.2.0 250728 Added verify communications function to MCRCom class in order to reinitialize the com port 
