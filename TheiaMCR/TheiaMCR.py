@@ -378,6 +378,9 @@ class MCRControl():
             - PIStep (step position of the photo interrupter limit switch)
             - maxSteps
             - respectLimits (set True to prevent motor from exceeding limits)
+            ### low level and beta variables
+            - acceleration (motor acceleration steps, currently not implemented in hardware)
+            - slowHomeApproach (set True to jog back and forth during homing and approach home at slow speed)
             ### Private functions:
             - checkLimits(self, steps:int, limitStep:bool=False) -> int
             '''
@@ -389,6 +392,8 @@ class MCRControl():
             self.respectLimits = True
             # set acceleration
             self.acceleration = accel << 3 | 0x01
+            # testing variables
+            self.slowHomeApproach = False
 
             # set PI side
             if (steps - pi) < pi:
@@ -404,8 +409,10 @@ class MCRControl():
                 speedRange = 1
             elif self.motorID == MCR_IRIS_MOTOR_ID:
                 self.currentSpeed = MCR_IRIS_DEFAULT_SPEED
+                self.homingSpeed = MCR_IRIS_DEFAULT_SPEED
             else:
                 self.currentSpeed = MCR_IRC_DEFAULT_SPEED
+                self.homingSpeed = MCR_IRC_DEFAULT_SPEED
 
             # initialize the motor control board instance for sending the commands
             self.MCRBoard = MCRControl.controllerClass(parent=self.parent)
@@ -459,16 +466,16 @@ class MCRControl():
             # move the motor to expected PI position (110% of max steps)
             homeSpeed = self.homingSpeed if self.motorID in MCR_FOCUS_ZOOM_MOTORS_IDS else MCR_IRIS_DEFAULT_SPEED
             homeApproachSpeed = MCR_FZ_APPROACH_SPEED if self.motorID in MCR_FOCUS_ZOOM_MOTORS_IDS else MCR_IRIS_DEFAULT_SPEED
-            success = self._motorMove(steps=(self.maxSteps * 1.1) * self.PISide, speed=max(self.currentSpeed, homeSpeed), acceleration=self.acceleration)
-            if self.motorID == 0x01 or self.motorID == 0x02:
+            success = self._motorMove(steps=(self.maxSteps * 1.1) * self.PISide, speed=homeSpeed, acceleration=self.acceleration)
+            if (self.motorID == 0x01 or self.motorID == 0x02) and self.slowHomeApproach:
                 # confirm the motor is at the PI and not past the PI position, move the difference between max steps and PI position + 40 steps over the expected (max - PIStep) to be sure since the physical max step is variable.  
                 piCheckSteps = (self.PIStep - self.maxSteps) if self.PISide == 1 else self.PIStep
                 time.sleep(MCR_MOVE_REST_TIME)
                 # move away from PI at full speed
-                self._motorMove(steps=(piCheckSteps - self.PISide * MCR_HARDSTOP_TOLERANCE), speed=max(self.currentSpeed, homeSpeed), acceleration=self.acceleration)
+                self._motorMove(steps=(piCheckSteps - self.PISide * MCR_HARDSTOP_TOLERANCE), speed=homeSpeed, acceleration=self.acceleration)
                 time.sleep(MCR_MOVE_REST_TIME)
                 # move back, towards PI at full speed but not all the way
-                self._motorMove(steps=-piCheckSteps + self.PISide * (MCR_HARDSTOP_TOLERANCE - 50), speed=max(self.currentSpeed, homeSpeed), acceleration=self.acceleration)
+                self._motorMove(steps=-piCheckSteps + self.PISide * (MCR_HARDSTOP_TOLERANCE - 50), speed=homeSpeed, acceleration=self.acceleration)
                 # slow down and hit PI at slower speed
                 success = self._motorMove(steps=self.PISide * 100, speed=homeApproachSpeed, acceleration=self.acceleration)
 
