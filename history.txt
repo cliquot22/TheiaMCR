@@ -2,7 +2,7 @@
 --Time out if no response from comport (MCR not connected to that com port)
 
 # revision history
-    v.3.3.3 250827 bug: changed slowHomeApproach default to False 
+    v.3.3.4 250827 bug: changed slowHomeApproach default to False 
     v.3.3.2 250825 bug: added homingSpeed to iris and IRC  
     v.3.3.1 250822 bug: fixed homing speed implementation
                 added a less robust homing method; no back and forth, mostly for internal testing 
