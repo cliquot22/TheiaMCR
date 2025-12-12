@@ -2,6 +2,13 @@
 --Time out if no response from comport (MCR not connected to that com port)
 
 # revision history
+v.3.4.0 251016 bug: corrected slow home approach usage during motor init 
+                bug: access the right motor variables in the depricated functions of the controller class 
+                bug: corrected MCRInitialized test in __init__()
+                corrected some other pylance errors (None -> '' for strings, etc)
+                Added success return value to initLogging() function 
+                Removed slowHomeApproach option and changed home and moveAbs procedures to use a different firmware command (0x73), changed home(), moveAbs(), and _motorMove() function to support.  
+                Added check limits for moveAbs to keep the target in the 0~max steps range. 
     v.3.3.4 250827 bug: changed slowHomeApproach default to False 
     v.3.3.2 250825 bug: added homingSpeed to iris and IRC  
     v.3.3.1 250822 bug: fixed homing speed implementation
