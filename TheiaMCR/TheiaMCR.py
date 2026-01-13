@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
 # internal constants used across the classes in this module.  
-MCR_REVISION = 'v.3.4.0'
+MCR_REVISION = 'v.3.4.1'
 
 RESPONSE_READ_TIME = 500                # (ms) max time for the MCR to post a response in the buffer
 MCR_FOCUS_MOTOR_ID = 0x01               # motor ID's as specified in the motor control documentation
@@ -130,10 +130,19 @@ class MCRControl():
         (c)2023-2025 Theia Technologies
         www.TheiaTech.com
         '''
-        if MCRControl.MCRInitialized:
-            MCRControl.log.warning(f'MCRControl already initialized for {serialPortName}')
+        # Check if THIS instance has been initialized already
+        if hasattr(self, '_instanceInitialized') and self._instanceInitialized:
+            # Instance was already initialized - check if it's for the same port
+            if hasattr(self, 'serialPortName') and self.serialPortName == serialPortName:
+                # Same port, already initialized - nothing to do
+                MCRControl.log.debug(f'MCRControl already initialized for {serialPortName}')
+                return
+            # Different port - this shouldn't happen with singleton pattern, but handle it
+            MCRControl.log.warning(f'Unexpected: Instance initialized for {self.serialPortName} but called with {serialPortName}')
             return
         
+        # Mark that we're initializing (before any operations)
+        self._instanceInitialized = False
         self.boardInitialized = False
         self.boardCommunicationState = False
         self.boardCommunicationRestarts = 0
@@ -156,7 +165,7 @@ class MCRControl():
             # send a test command to the board to read FW version
             response = self.MCRBoard.readFWRevision()
             if response == None or int(response.rsplit('.', -1)[0]) < 5:
-                MCRControl.log.error("Error: No resonse received from MCR controller")
+                MCRControl.log.error("Error: No response received from MCR controller")
                 err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
                 comInitSuccess = err.ERR_NO_COMMUNICATION
             else:
@@ -169,6 +178,7 @@ class MCRControl():
             self.zoom = None
             self.iris = None
             MCRControl.MCRInitialized = True
+            self._instanceInitialized = True  # Mark instance as fully initialized
         else:
             MCRControl.log.error('MCRControl initialization failed')
             err.saveError(err.ERR_NOT_INIT, err.MOD_MCR, err.errLine())
@@ -177,6 +187,7 @@ class MCRControl():
             self.iris = MCRInitFailed()
             self.MCRBoard = MCRInitFailed()
             MCRControl.MCRInitialized = False
+            self._instanceInitialized = False  # Mark initialization as failed
 
     # Motor initialization
     @overload
@@ -305,6 +316,15 @@ class MCRControl():
         if self.consoleLogHandler: 
             self.consoleLogHandler.close()
             self.consoleLogHandler = None
+        
+        # Reset initialization flags
+        self._instanceInitialized = False
+        self.boardInitialized = False
+        
+        # Remove from instances cache if present
+        if hasattr(self, 'serialPortName') and self.serialPortName in MCRControl._instances:
+            del MCRControl._instances[self.serialPortName]
+            MCRControl.log.debug(f'Removed {self.serialPortName} from instances cache')
 
     # check and reopen board communication via serial port
     def checkBoardCommunication(self) -> bool:
@@ -348,6 +368,11 @@ class MCRControl():
                     self.fileLogHandler = None
 
             try:
+                # Remove any existing StreamHandlers to avoid duplicates
+                existingHandlers = [h for h in MCRControl.log.handlers if isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler)]
+                for handler in existingHandlers:
+                    MCRControl.log.removeHandler(handler)
+                
                 self.consoleLogHandler = logging.StreamHandler()
                 self.consoleLogHandler.setLevel(logging.DEBUG) if consoleLog else self.consoleLogHandler.setLevel(logging.INFO)
 
@@ -1269,7 +1294,7 @@ class MCRControl():
                 sn = f'{response[1]:02x}{response[2]:02x}'
                 sn = sn[:-1]
                 sn += f'-{response[-4]:02x}{response[-3]:02x}{response[-2]:02x}'
-                MCRControl.log.info(f"Baord serial number {sn}")
+                MCRControl.log.info(f"Board serial number {sn}")
             return sn
         
         # communication path
