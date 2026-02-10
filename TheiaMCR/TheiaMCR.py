@@ -1410,6 +1410,7 @@ class MCRControl():
             '''
             self.parent = parent
             self.serialPort = None
+            self.serialPortException = None  # Store exception details
             self.parent.boardCommunicationState = False
             if self.parent.serialPort is None:
                 try:
@@ -1423,7 +1424,15 @@ class MCRControl():
                     success = 0
                     MCRControl.log.debug(f"Serial communication opened on {serialPortName} successfully")
                 except serial.SerialException as e:
-                    MCRControl.log.error("Serial port not open {}".format(e))
+                    self.serialPortException = str(e)  # Store exception message
+                    error_msg = str(e).lower()
+                    
+                    # Check for specific error conditions
+                    if 'permissionerror' in error_msg or 'access is denied' in error_msg or 'in use' in error_msg or 'cannot access' in error_msg:
+                        MCRControl.log.error(f"Serial port {serialPortName} is already in use by another application: {e}")
+                    else:
+                        MCRControl.log.error("Serial port not open {}".format(e))
+                    
                     err.saveError(err.ERR_SERIAL_PORT, err.MOD_MCR, err.errLine())
                     success = err.ERR_SERIAL_PORT
                 self.initialized = success

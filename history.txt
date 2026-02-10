@@ -2,6 +2,7 @@
 --Time out if no response from comport (MCR not connected to that com port)
 
 # revision history
+    v.3.4.2 260210 bug: enhanced check for com port availability.  prevent multiple com port connections to same port. 
     v.3.4.1 250113 bug: handle switching com ports by reinitializing the class, remove duplicate log handlers (open with each com port)
 v.3.4.0 251016 bug: corrected slow home approach usage during motor init 
                 bug: access the right motor variables in the depricated functions of the controller class 
