@@ -10,6 +10,7 @@
 # www.TheiaTech.com
 # BSD 3-clause license applies
 
+from __future__ import annotations
 import serial
 import time
 import TheiaMCR.errList as err
@@ -24,7 +25,7 @@ log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
 # internal constants used across the classes in this module.  
-MCR_REVISION = 'v.3.4.1'
+MCR_REVISION = 'v.3.4.3'
 
 RESPONSE_READ_TIME = 500                # (ms) max time for the MCR to post a response in the buffer
 MCR_FOCUS_MOTOR_ID = 0x01               # motor ID's as specified in the motor control documentation
@@ -59,12 +60,22 @@ def unhandledException(exc_type, exc_value, exc_traceback):
 sys.excepthook = unhandledException
 
 ##### wrapper functions to check for initialization ##############
-def MCRInitFailed():
+class MCRInitFailed:
     '''
     This class is used to handle the case when MCRControl is not initialized.
     It provides a way to prevent crashes when trying to access methods or attributes
     of MCRControl when it is not initialized.
     '''
+    # initialization variables to match potential calls to motor class varaibles
+    initialized = False
+    currentStep = 0
+    PIStep = 0
+    PISide = -1
+    maxSteps = 0
+    currentSpeed = 0
+    homingSpeed = 0
+    respectLimits = False
+
     def __getattr__(self, name):
         def method(*args, **kwargs):
             MCRControl.log.error(f'{name} cannot be executed because MCRBoard is not initialized.')
@@ -130,6 +141,12 @@ class MCRControl():
         (c)2023-2025 Theia Technologies
         www.TheiaTech.com
         '''
+        self.focus: MCRControl.motor | MCRInitFailed = MCRInitFailed()
+        self.zoom: MCRControl.motor | MCRInitFailed = MCRInitFailed()
+        self.iris: MCRControl.motor | MCRInitFailed = MCRInitFailed()
+        self.IRC: MCRControl.motor | MCRInitFailed = MCRInitFailed()
+        self.MCRBoard: MCRControl.controllerClass | MCRInitFailed = MCRInitFailed()
+
         # Check if THIS instance has been initialized already
         if hasattr(self, '_instanceInitialized') and self._instanceInitialized:
             # Instance was already initialized - check if it's for the same port
@@ -174,9 +191,6 @@ class MCRControl():
 
         # ultimate success
         if (comInitSuccess >= 0) and loggingInitSuccess:
-            self.focus = None 
-            self.zoom = None
-            self.iris = None
             MCRControl.MCRInitialized = True
             self._instanceInitialized = True  # Mark instance as fully initialized
         else:
@@ -302,13 +316,13 @@ class MCRControl():
             self.com.initialized = False
 
         if self.MCRBoard: 
-            self.MCRBoard = None
+            self.MCRBoard = MCRInitFailed()
         if self.focus: 
-            self.focus = None
+            self.focus = MCRInitFailed()
         if self.zoom: 
-            self.zoom = None
+            self.zoom = MCRInitFailed()
         if self.iris: 
-            self.iris = None
+            self.iris = MCRInitFailed()
 
         if self.fileLogHandler:
             self.fileLogHandler.close()
