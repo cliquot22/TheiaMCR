@@ -25,7 +25,7 @@ log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
 # internal constants used across the classes in this module.  
-MCR_REVISION = 'v.3.4.3'
+MCR_REVISION = 'v.3.5.0'
 
 RESPONSE_READ_TIME = 500                # (ms) max time for the MCR to post a response in the buffer
 MCR_FOCUS_MOTOR_ID = 0x01               # motor ID's as specified in the motor control documentation
@@ -205,11 +205,11 @@ class MCRControl():
 
     # Motor initialization
     @overload
-    def focusInit(self, steps:int, pi:int, move:bool=True, accel:int=0, slowHome:bool=None) -> bool: ...  #type: ignore
+    def focusInit(self, steps:int, pi:int, move:bool=True, accel:int=0, homingSpeed:int=-1, slowHome:bool | None=None) -> bool: ... 
     @overload
-    def focusInit(self, steps:int, pi:int, move:bool=True, accel:int=0) -> bool: ...
+    def focusInit(self, steps:int, pi:int, move:bool=True, accel:int=0, homingSpeed:int=-1) -> bool: ...
 
-    def focusInit(self, steps:int, pi:int, move:bool=True, accel:int=0, slowHome:bool=None) -> bool:  #type: ignore
+    def focusInit(self, steps:int, pi:int, move:bool=True, accel:int=0, homingSpeed:int=-1, slowHome:bool | None=None) -> bool:  
         '''
         Initialize the parameters of the motor.  This must be called after the board is initialized.  
         ### input: 
@@ -217,26 +217,28 @@ class MCRControl():
         - pi: pi location in step number
         - move: (optional, True) move motor to home position or (False) initialize without moving. 
         - accel: (optional, 0) motor acceleration steps (check motor control documentation to see if this variable is supported in firmware)
+        - homingSpeed: (optional, -1) speed to use when homing the motor (will be set to default speed if out of range)
 
         - slowHome: (deprecated in v.3.4) no longer supported. 
         ### return: 
         [True | (False, error int)] if motor initialization was successful or not
         '''
-        if slowHome is not None:
+        if slowHome is not None or homingSpeed == int(True) or homingSpeed == int(False):
             MCRControl.log.warning('focusInit: slowHome parameter is deprecated and no longer supported as of v.3.4')
         if not self.boardInitialized: 
             MCRControl.log.warning(f'focusInit can\'t be called because board isn\'t initialized')
             return False
         
         MCRControl.log.debug(f'_init,{MCR_FOCUS_MOTOR_ID}')
-        self.focus = self.motor(self, MCR_FOCUS_MOTOR_ID, steps, pi, move, accel)
+        self.focus = self.motor(self, MCR_FOCUS_MOTOR_ID, steps, pi, move=move, accel=accel, homingSpeed=homingSpeed)
         return self.focus.initialized
 
     @overload
-    def zoomInit(self, steps:int, pi:int, move:bool=True, accel:int=0, slowHome:bool=None) -> bool: ...  #type: ignore
+    def zoomInit(self, steps:int, pi:int, move:bool=True, accel:int=0, homingSpeed:int=-1, slowHome:bool | None=None) -> bool: ...  
     @overload
-    def zoomInit(self, steps:int, pi:int, move:bool=True, accel:int=0) -> bool: ...
-    def zoomInit(self, steps:int, pi:int, move:bool=True, accel:int=0, slowHome:bool=None) -> bool:  #type: ignore
+    def zoomInit(self, steps:int, pi:int, move:bool=True, accel:int=0, homingSpeed:int=-1) -> bool: ...
+
+    def zoomInit(self, steps:int, pi:int, move:bool=True, accel:int=0, homingSpeed:int=-1, slowHome:bool | None=None) -> bool: 
         '''
         Initialize the parameters of the motor.  This must be called after the board is initialized.  
         ### input: 
@@ -249,22 +251,23 @@ class MCRControl():
         ### return: 
         [True | (False, error int)] if motor initialization was successful or not
         '''
-        if slowHome is not None:
+        if slowHome is not None or homingSpeed == int(True) or homingSpeed == int(False):
             MCRControl.log.warning('zoomInit: slowHome parameter is deprecated and no longer supported as of v.3.4')
         if not self.boardInitialized: 
             MCRControl.log.warning(f'zoomInit can\'t be called because board isn\'t initialized')
             return False
         
         MCRControl.log.debug(f'_init,{MCR_ZOOM_MOTOR_ID}')
-        self.zoom = self.motor(self, MCR_ZOOM_MOTOR_ID, steps, pi, move, accel)
+        self.zoom = self.motor(self, MCR_ZOOM_MOTOR_ID, steps, pi, move=move, accel=accel, homingSpeed=homingSpeed)
         return self.zoom.initialized
     
-    def irisInit(self, steps:int, move:bool=True) -> bool:
+    def irisInit(self, steps:int, move:bool=True, homingSpeed:int=-1) -> bool:
         '''
         Initialize the parameters of the motor.  This must be called after the board is initialized.  
         ### input: 
         - steps: maximum number of steps
         - move: (optional, True) move motor to home position or (False) initialize without moving. 
+        - homingSpeed: (optional, -1) speed to use when homing the motor (will be set to default speed if out of range)
         ### return: 
         [True | (False, error int)] if motor initialization was successful or not
         '''
@@ -273,7 +276,7 @@ class MCRControl():
             return False
         
         MCRControl.log.debug(f'_init,{MCR_IRIS_MOTOR_ID}')
-        self.iris = self.motor(self, MCR_IRIS_MOTOR_ID, steps, pi=0, move=move, accel=0)
+        self.iris = self.motor(self, MCR_IRIS_MOTOR_ID, steps, pi=0, move=move, accel=0, homingSpeed=homingSpeed)
         return self.iris.initialized
 
     # IRCInit
@@ -423,7 +426,7 @@ class MCRControl():
     # Motor definition class
     class motor():
         # initialize the parameters of the motor
-        def __init__(self, parent, motorID:int, steps:int, pi:int, move:bool=True, accel:int=0):
+        def __init__(self, parent, motorID:int, steps:int, pi:int, move:bool=True, accel:int=0, homingSpeed:int=-1):
             '''
             The class is used for the focus, zoom, and iris motors.  The only difference between these motors are speeds and number of steps.  
             ### Public functions: 
@@ -446,6 +449,7 @@ class MCRControl():
             - pi: pi location in step number
             - move: (optional, True) move motor to home position after initializing
             - accel: (optional, 0) motor acceleration steps.  Check the documentation to see if acceleration is supported in the firmware.  
+            - homingSpeed: (optional, -1) speed to use when homing the motor (will be set to default speed if out of range)
             ### instance variables
             - initialized
             - currentStep
@@ -479,11 +483,15 @@ class MCRControl():
             speedRange = 0
             if self.motorID in MCR_FOCUS_ZOOM_MOTORS_IDS:
                 self.currentSpeed = MCR_FZ_DEFAULT_SPEED
-                self.homingSpeed = MCR_FZ_HOME_SPEED
+                res = self.setHomingSpeed(homingSpeed)
+                if res != err.ERR_OK:
+                    self.homingSpeed = MCR_FZ_HOME_SPEED
                 speedRange = 1
             elif self.motorID == MCR_IRIS_MOTOR_ID:
                 self.currentSpeed = MCR_IRIS_DEFAULT_SPEED
-                self.homingSpeed = MCR_IRIS_DEFAULT_SPEED
+                res = self.setHomingSpeed(homingSpeed)
+                if res != err.ERR_OK:
+                    self.homingSpeed = MCR_IRIS_DEFAULT_SPEED
             else:
                 self.currentSpeed = MCR_IRC_DEFAULT_SPEED
                 self.homingSpeed = MCR_IRC_DEFAULT_SPEED
@@ -775,6 +783,10 @@ class MCRControl():
             if self.motorID in {MCR_FOCUS_MOTOR_ID, MCR_ZOOM_MOTOR_ID}:
                 if speed > 1500 or speed < 100:
                     MCRControl.log.warning(f'Requested speed {speed} is outside range 100-1500')
+                    return err.ERR_RANGE
+            elif self.motorID == MCR_IRIS_MOTOR_ID:
+                if speed > 200 or speed < 10:
+                    MCRControl.log.warning(f'Requested speed {speed} is outside range 10-200')
                     return err.ERR_RANGE
             self.homingSpeed = speed
             MCRControl.log.debug(f'_homingSpeed,{self.motorID},,{self.homingSpeed}')

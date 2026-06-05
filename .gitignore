@@ -6,3 +6,5 @@ dist
 build
 TheiaMCR.egg-info
 TheiaMCR.test
+.gitattributes
+.venv

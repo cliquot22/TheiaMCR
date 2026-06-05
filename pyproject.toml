@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "TheiaMCR"
 ###                        Be sure to updated the version number in the TheiaMCR.py file ###
-version = "3.4.3"
+version = "3.5.0"
 authors = [
   { name="Mark Peterson", email="mpeterson@theiatech.com" },
 ]
@@ -24,6 +24,13 @@ license = "BSD-3-Clause"
 license-files = ["LICENSE"]
 dependencies = [
   "pyserial>=3.5"
+]
+
+[project.optional-dependencies]
+dev = [
+  "build>=1.5.0",
+  "twine>=6.0.0",
+  "pytest>=9.0.0"
 ]
 
 [project.urls]
