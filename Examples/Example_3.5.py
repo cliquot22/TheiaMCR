@@ -2,7 +2,9 @@
 # A MCR600 series control board must be connected to the Windows comptuer via USB.  
 # Set the virtual comport name in the variable 'comport' of the main program (starting approx line 285)
 #
-# updated for MCR version 3.2
+# updated for MCR version 3.4
+#
+# pyright: reportOptionalMemberAccess=false
 
 import TheiaMCR as mcr
 import logging
