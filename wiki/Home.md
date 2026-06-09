@@ -22,6 +22,12 @@ The host PC communicates with the MCR IQ 600 board over a USB serial connection.
 
 ---
 
+## Alternative Implementation
+
+A [C++ version of TheiaMCR](https://github.com/cliquot22/TheiaMCR_C) is also available, featuring a native C++ implementation and pybind11 bindings for Python integration.
+
+---
+
 ## Installation
 
 ```

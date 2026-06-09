@@ -1,5 +1,7 @@
 # Theia Technologies motor control board interface
-[Theia Technologies](https://www.theiatech.com) offers a [MCR IQ 400 motor control board](https://www.theiatech.com/lenses/accessories/mcr/) for controlling Theia's motorized lenses.  This board controls focus, zoom, iris, and IRC filter motors.  It can be connected to a host comptuer by USB, UART, or I2C connection.  
+[Theia Technologies](https://www.theiatech.com) offers a [MCR IQ 400 motor control board](https://www.theiatech.com/lenses/accessories/mcr/) for controlling Theia's motorized lenses.  This board controls focus, zoom, iris, and IRC filter motors.  It can be connected to a host comptuer by USB, UART, or I2C connection.
+
+> **Also available:** [C++ version of TheiaMCR](https://github.com/cliquot22/TheiaMCR_C) — includes native C++ implementation and pybind11 bindings for Python integration.  
 
 # Features
 <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/python/python-original.svg" alt="python" width="20" height="20"/> The MCR IQ 400 board (and MCR IQ 600, MCR IQ 500 and others in the MCR series) has a proprietary command protocol to control and get information from the control program.  The protocol is a customized string of up to 12 bytes which can be deciphered in the MCR IQ 400 [documentation](https://www.theiatech.com/lenses/accessories/mcr/).  For ease of use, Theia has developed this Python module to format the custom byte strings and send them to the board.  For example, the user can request the focus motor to move 1000 steps.  The `focusRel()` function will convert this request to the appropriate byte string and send it over USB connection to the MCR control board.  This will cause the lens motor to move 1000 steps.  
