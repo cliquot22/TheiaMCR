@@ -69,12 +69,11 @@ jobs:
         run: |
           echo "→ Fetching code scanning alerts..."
           for STATE in open dismissed; do
-            # --paginate fetches all pages; jq -s '[.[][]]' merges page arrays into one
+            # --jq '.[]' emits one item per line; jq -s '.' collects into a single array
             gh api --paginate \
               "repos/$REPO/code-scanning/alerts?state=$STATE&per_page=100" \
-              > /tmp/cs_${STATE}.json 2>/dev/null || true
-            jq -s '[.[][]]' /tmp/cs_${STATE}.json \
-              > report/code-scanning-${STATE}.json 2>/dev/null \
+              --jq '.[]' 2>/dev/null \
+              | jq -s '.' > report/code-scanning-${STATE}.json \
               || echo '[]' > report/code-scanning-${STATE}.json
           done
           echo "✓ Code scanning: $(jq length report/code-scanning-open.json) open," \
@@ -87,9 +86,8 @@ jobs:
           for STATE in open dismissed; do
             gh api --paginate \
               "repos/$REPO/dependabot/alerts?state=$STATE&per_page=100" \
-              > /tmp/dep_${STATE}.json 2>/dev/null || true
-            jq -s '[.[][]]' /tmp/dep_${STATE}.json \
-              > report/dependabot-${STATE}.json 2>/dev/null \
+              --jq '.[]' 2>/dev/null \
+              | jq -s '.' > report/dependabot-${STATE}.json \
               || echo '[]' > report/dependabot-${STATE}.json
           done
           echo "✓ Dependabot: $(jq length report/dependabot-open.json) open," \

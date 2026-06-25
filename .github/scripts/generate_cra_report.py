@@ -44,7 +44,7 @@ ref     = os.environ.get('GH_REF', 'unknown')
 sha     = os.environ.get('GH_SHA', '')[:8]
 run_id  = os.environ.get('GH_RUN_ID', '')
 run_url = f'https://github.com/{repo}/actions/runs/{run_id}'
-date    = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
+date    = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
 
 
 # ── Severity helpers ───────────────────────────────────────────────────────────
