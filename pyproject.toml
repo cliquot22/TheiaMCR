@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "TheiaMCR"
 ###                        Be sure to updated the version number in the TheiaMCR.py file ###
-version = "3.5.0"
+version = "3.5.1"
 authors = [
   { name="Mark Peterson", email="mpeterson@theiatech.com" },
 ]

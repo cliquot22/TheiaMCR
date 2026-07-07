@@ -1,7 +1,8 @@
-# to do
---Time out if no response from comport (MCR not connected to that com port)
-
 # revision history
+    v.3.5.1 260630 created fuzz test plan and error propogation tests. 
+                bug: _sendCmd() check for 0-length command 
+                bugs: fixed some error propogation if _sendCmd() returns an error 
+                bug: fixed close() function to fully release resources 
 v.3.5.0 250605 added homing speed parameter when initializing motors
     v.3.4.3 260519 changed MCRInitFailed to a class for runtime error performance and pylance error checking
                 modernized pyproject.toml file 

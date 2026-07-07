@@ -18,6 +18,7 @@ import logging
 from os import path
 import TheiaMCR.rotatingLogFiles as rotLogFiles
 import sys
+import gc
 from typing import overload
 
 # create a logger instance for this module
@@ -25,7 +26,7 @@ log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
 # internal constants used across the classes in this module.  
-MCR_REVISION = 'v.3.5.0'
+MCR_REVISION = 'v.3.5.1'
 
 RESPONSE_READ_TIME = 500                # (ms) max time for the MCR to post a response in the buffer
 MCR_FOCUS_MOTOR_ID = 0x01               # motor ID's as specified in the motor control documentation
@@ -138,7 +139,7 @@ class MCRControl():
         - controllerClass
         - MCRCom
 
-        (c)2023-2025 Theia Technologies
+        (c)2023-2026 Theia Technologies
         www.TheiaTech.com
         '''
         self.focus: MCRControl.motor | MCRInitFailed = MCRInitFailed()
@@ -311,12 +312,59 @@ class MCRControl():
     def close(self):
         '''
         Close the MCR board and release the serial port and other resources.
+
+        In the calling function be sure to delete the MCR variable and call garbage collection
+        to ensure the COM port and other resources are fully released:
+            del MCR
+            gc.collect()
         '''
         MCRControl.log.debug('_close (exit)')
-        if self.com.initialized:
-            if self.serialPort: self.serialPort.close()
+        
+        # Close log handlers first to avoid any interference
+        if self.fileLogHandler:
+            self.fileLogHandler.close()
+            self.fileLogHandler = None
+        if self.consoleLogHandler:
+            self.consoleLogHandler.close()
+            self.consoleLogHandler = None
+        
+        # Now handle serial port closure
+        if self.com and self.com.initialized:
+            if self.serialPort:
+                try:
+                    # Flush buffers before closing
+                    self.serialPort.flush()
+                    self.serialPort.reset_input_buffer()
+                    self.serialPort.reset_output_buffer()
+                except Exception as e:
+                    MCRControl.log.debug(f'Exception during serial port flush: {e}')
+                
+                try:
+                    self.serialPort.close()
+                    MCRControl.log.debug('Serial port closed')
+                except Exception as e:
+                    MCRControl.log.error(f'Exception during serial port close: {e}')
+                
+            # Break circular reference and clear all serial port references
+            if self.com:
+                self.com.serialPort = None
+                self.com.parent = None  # Break circular reference
+                self.com.initialized = False
+            
+            # Explicitly delete the serial port object
+            if self.serialPort:
+                del self.serialPort
             self.serialPort = None
-            self.com.initialized = False
+            
+            # Clear the com object itself to ensure no lingering references
+            self.com = None
+            
+            # Force garbage collection to release the COM port
+            gc.collect()
+            
+            # Give Windows additional time to release the COM port handle
+            # Windows can take longer to fully release serial port resources
+            time.sleep(0.5)
 
         if self.MCRBoard: 
             self.MCRBoard = MCRInitFailed()
@@ -326,13 +374,6 @@ class MCRControl():
             self.zoom = MCRInitFailed()
         if self.iris: 
             self.iris = MCRInitFailed()
-
-        if self.fileLogHandler:
-            self.fileLogHandler.close()
-            self.fileLogHandler = None
-        if self.consoleLogHandler: 
-            self.consoleLogHandler.close()
-            self.consoleLogHandler = None
         
         # Reset initialization flags
         self._instanceInitialized = False
@@ -547,19 +588,23 @@ class MCRControl():
             if (self.PISide == 1 and self.currentStep > self.PIStep) or (self.PISide == -1 and self.currentStep < self.PIStep):
                 # move away from PI first
                 awaySteps = abs(self.currentStep - self.PIStep) + MCR_HARDSTOP_TOLERANCE
-                self._motorMove(steps=-awaySteps * self.PISide, speed=self.homingSpeed, acceleration=self.acceleration)
+                success = self._motorMove(steps=-awaySteps * self.PISide, speed=self.homingSpeed, acceleration=self.acceleration)
                 time.sleep(MCR_MOVE_REST_TIME)
+                if not success:
+                    MCRControl.log.error(f"Error: Motor 0x{self.motorID:02X} PI right-siding error")
+                    err.saveError(err.ERR_BAD_MOVE, err.MOD_MCR, err.errLine())
+                    return err.ERR_BAD_MOVE
             
             # move the motor to home PI position
             success = self._motorMoveTo(finalStep=self.PIStep, speed=homeSpeed, acceleration=self.acceleration)
 
             # reset the respect limit state
             if setIgnoreLimitsToFalse: self.setRespectLimits(False)
-            self.currentStep = self.PIStep
             if not success:
                 MCRControl.log.error(f"Error: Motor 0x{self.motorID:02X} move error")
                 err.saveError(err.ERR_BAD_MOVE, err.MOD_MCR, err.errLine())
                 return err.ERR_BAD_MOVE
+            self.currentStep = self.PIStep
             MCRControl.log.debug(f'_finalStep,{self.motorID},,{self.currentStep}')
             return err.ERR_OK
         
@@ -612,12 +657,17 @@ class MCRControl():
             if (self.PISide == 1 and self.currentStep > self.PIStep) or (self.PISide == -1 and self.currentStep < self.PIStep):
                 # move away from PI first
                 awaySteps = abs(self.currentStep - self.PIStep) + MCR_HARDSTOP_TOLERANCE
-                self._motorMove(steps=-awaySteps * self.PISide, speed=self.currentSpeed, acceleration=self.acceleration)
+                success = self._motorMove(steps=-awaySteps * self.PISide, speed=self.currentSpeed, acceleration=self.acceleration)
                 time.sleep(MCR_MOVE_REST_TIME)
+                if not success:
+                    MCRControl.log.error(f"Error: Motor 0x{self.motorID:02X} PI right-siding error")
+                    err.saveError(err.ERR_BAD_MOVE, err.MOD_MCR, err.errLine())
+                    return err.ERR_BAD_MOVE
 
             # move to absolute position 
             success = self._motorMoveTo(finalStep=step, speed=self.currentSpeed, acceleration=self.acceleration)
             if not success:
+                MCRControl.log.error(f"Error: Motor 0x{self.motorID:02X} move error")
                 err.saveError(err.ERR_BAD_MOVE, err.MOD_MCR, err.errLine())
                 return err.ERR_BAD_MOVE
             
@@ -626,6 +676,7 @@ class MCRControl():
                 time.sleep(MCR_MOVE_REST_TIME)
                 success = self._motorMove(steps=additionalMoveSteps, speed=self.currentSpeed, acceleration=self.acceleration)
                 if not success:
+                    MCRControl.log.error(f"Error: Motor 0x{self.motorID:02X} past-PI move error")
                     err.saveError(err.ERR_BAD_MOVE, err.MOD_MCR, err.errLine())
                     return err.ERR_BAD_MOVE
                 
@@ -678,7 +729,7 @@ class MCRControl():
                 blCorrection = max(0,min(MCR_BACKLASH_OVERSHOOT, self.PIStep * ((self.PIStep if self.respectLimits else (self.maxSteps if self.PIStep > 0 else 0)) - (steps + self.currentStep))))
 
                 success = self._motorMove(steps + self.PISide * blCorrection, self.currentSpeed, self.acceleration)
-                if blCorrection > 0: 
+                if success and blCorrection > 0: 
                     # move back by the BL correction amount
                     time.sleep(MCR_MOVE_REST_TIME)
                     success = self._motorMove(-self.PISide * blCorrection, self.currentSpeed, self.acceleration)
@@ -686,10 +737,12 @@ class MCRControl():
                 # no need for backlash adjustment
                 success = self._motorMove(steps, self.currentSpeed, self.acceleration)
                 
-            self.currentStep += steps
             if not success:
+                MCRControl.log.error(f"Error: Motor 0x{self.motorID:02X} move error")
                 err.saveError(err.ERR_BAD_MOVE, err.MOD_MCR, err.errLine())
                 return err.ERR_BAD_MOVE
+            
+            self.currentStep += steps
             MCRControl.log.debug(f'_finalStep,{self.motorID},,{self.currentStep}')
             return err.ERR_OK
         
@@ -714,11 +767,14 @@ class MCRControl():
                 sw *= -1                ## move in negative direction
             success = self._motorMove(steps=sw, speed=MCR_IRC_DEFAULT_SPEED)
 
-            if not success: return err.ERR_BAD_MOVE
+            if not success: 
+                MCRControl.log.error("Error: IRC move error")
+                err.saveError(err.ERR_BAD_MOVE, err.MOD_MCR, err.errLine())
+                return err.ERR_BAD_MOVE
             return state
         
         # setRespectLimits
-        def setRespectLimits(self, state:bool):
+        def setRespectLimits(self, state:bool) -> bool | None:
             '''
             Set the flag to stop motor moves at the PI limits or to continue past the limits.  In some cases
             the limits should be turned off to get to the target motor position.  
@@ -1141,7 +1197,6 @@ class MCRControl():
             # send the command
             response = bytearray(12)
             response = self.com._sendCmd(cmd, waitTime)
-            MCRControl.log.debug(f'--wait time: {waitTime} ms: {(waitTime / 1200):.0f}')#########################
 
             success = True
             if response[1] != 0x00:
@@ -1152,10 +1207,18 @@ class MCRControl():
                 boardCommunication = self.com._verifyCommunication()
                 MCRControl.log.warning(f'...Communication with MCR board {"re-established" if boardCommunication else "failed"}')
 
-                if not self.parent.boardCommunicationState:
+                if self.parent.boardCommunicationState:
+                    # Communication re-established, retry the move command once
+                    MCRControl.log.info('Retrying motor move command...')
+                    response = self.com._sendCmd(cmd, waitTime)
+                    success = response[1] == 0x00
+                    if not success:
+                        MCRControl.log.error(f"Error: motor 0x{self.motorID:02X} move command failed after retry")
+                        err.saveError(err.ERR_SERIAL_PORT, err.MOD_MCR, err.errLine())
+                else:
+                    # Communication still not established
                     err.saveError(err.ERR_SERIAL_PORT, err.MOD_MCR, err.errLine())
-                success = False
-
+                    success = False
             return success
 
         # MCRRegardLimits
@@ -1274,12 +1337,12 @@ class MCRControl():
                 return ''
 
             response = ""
+            fw = ''
             cmd = bytearray(2)
             cmd[0] = 0x76
             cmd[1] = 0x0D
             response = self.com._sendCmd(cmd)
-            fw = ''
-            if response == None:
+            if response == None or len(response) != 7 :
                 MCRControl.log.error("Error: No resonse received from MCR controller")
                 if self.parent.boardCommunicationState:
                     err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
@@ -1298,7 +1361,7 @@ class MCRControl():
             Replies with a string representing the board serial number read from the response
             board response is hex digits interpreted (not converted) as decimal in a very specific format (ex. '055-001234')
             ### return: 
-            [string with serial number]
+            [string with serial number (ex. '055-001234') or '' if error reading the board SN]
             '''
             if not self.parent.boardInitialized: 
                 MCRControl.log.warning(f'readBoardSN can\'t be called because board isn\'t initialized')
@@ -1310,7 +1373,7 @@ class MCRControl():
             cmd[1] = 0x0D
             response = self.com._sendCmd(cmd)
             sn = ''
-            if response == None:
+            if response == None or len(response) != 8:
                 MCRControl.log.error("Error: No resonse received from MCR controller")
                 if self.parent.boardCommunicationState:
                     err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
@@ -1505,7 +1568,7 @@ class MCRControl():
             - cmd: byte string to send
             - waitTime (optional): (ms) wait before checking for a response
             ### return: 
-            [return byte string from MCR]
+            [return byte string from MCR] | [0x74, 0x01, 0x0D] on error (response[1] == 0x01)
             ### globals:  
             - set self.parent.boardCommunicationState to True if the serial port is open and communication is possible, False otherwise
             '''
@@ -1517,6 +1580,12 @@ class MCRControl():
                 self.parent.boardCommunicationState = False
                 return response
 
+            # check if cmd is empty
+            if not cmd or len(cmd) == 0:
+                MCRControl.log.error("Command string is empty")
+                response = bytearray([0x74, 0x01, 0x0D])
+                return response
+            
             # send the string
             if MCRControl.communicationDebugLevel: MCRControl.log.debug("   -> {}".format(":".join("{:02x}".format(c) for c in cmd)))
             try:

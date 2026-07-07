@@ -1,8 +1,8 @@
 # Example for using TheiaMCR module.  
 # A MCR600 series control board must be connected to the Windows comptuer via USB.  
-# Set the virtual comport name in the variable 'comport' of the main program (starting approx line 285)
+# Set the virtual comport name in the variable 'comport' of the main program (in setup() function)
 #
-# updated for MCR version 3.4
+# updated for MCR version 3.5
 #
 # pyright: reportOptionalMemberAccess=false
 
@@ -12,6 +12,43 @@ import time
 import os
 import serial.tools.list_ports
 import sys
+import gc
+
+lensTypes = ['TL410', 'TL1250']    
+
+######################
+### setup test suite, comport, and lens type in this function
+######################
+def setup():
+    # lens types
+    # test selection
+    # 1: search com ports and list all connected devices
+    # 2: initialize the board and motors
+    # 3: read and write a motor configuration (steps, speed, etc.)
+    # 4: move motors
+    # 5: turn off PI limit to show moving past PI position
+    # 6: close the background logging file 
+    # 7: close and release resources before exiting a program
+    # 8: (low level) show the byte string communications back and forth to the board 
+    # 9: change the input protocol from USB to UART or I2C 
+    # 10: reconnect to the com port in case of lost connection 
+    
+    runTest = [7,8]   ### select the test numbers to run (can be multiple)
+    lensType = 1    # 0: 'TL410', 1: 'TL1250'
+    
+    if runTest == []:
+        log.info('Select the tests and set variables in the main program setup() function. ')
+        sys.exit(0)
+    if os.name == 'nt':
+        comport = 'COM4'
+    else:
+        comport = '/dev/ttyUSB0'
+        # in Lunux make sure there is permission to access the port (sudo usermod -a -G dialout $USER)
+    return comport, runTest, lensType
+######################
+
+
+
 
 def searchComPorts():
     '''
@@ -54,6 +91,7 @@ def init(comport:str, lensType:str='TL1250', moduleDebugLevel=False, communicati
     log.info('Response (above) in the form: "FW revision: #.#.#.#.#"')
     
     # initialize the motors
+    # NOTE: not including homingSpeed in focusInit(), etc. will set the speed to default.  Ignore the warning from MCR.  
     if 'TL1250' in lensType:
         # TL1250 (TW60 or TW90)
         MCR.focusInit(steps=8390, pi=7959)
@@ -91,7 +129,11 @@ def motorConfiguration(comport:str, lensType:str='TL1250'):
 
     # read focus motor configuration (id = 0x01)
     log.info('Read motor configuration')
-    success, motorType, leftStop, rightStop, maxSteps, minSpeed, maxSpeed, errorVal = MCR.zoom.readMotorSetup()
+    if not MCR.zoom.initialized: 
+        log.error('Zoom lens initialization failed in init() function')
+        return 
+    # or check for zoom motor not initizlized afterwards with try: \ success... = MCR.zoom.readMotorSetup() \ if success... \ except (ValueError, TypeError): ...
+    success, motorType, leftStop, rightStop, maxSteps, minSpeed, maxSpeed, errorVal = MCR.zoom.readMotorSetup()  #type: ignore
     if success:
         log.info(f'Motor type: {motorType}, use stops: ({leftStop},{rightStop}), max steps: {maxSteps}, speed range ({minSpeed},{maxSpeed}), error: {errorVal}')
     else:
@@ -204,6 +246,10 @@ def close(comport:str):
         MCR.MCRBoard.readBoardSN()
     except:
         log.info('ERROR: No board response')
+    
+    # Explicitly delete the MCR variable to ensure Windows releases the COM port handle
+    del MCR
+    gc.collect()
 
 def viewCommunications(comport:str):
     '''
@@ -219,6 +265,7 @@ def viewCommunications(comport:str):
 
     # set up to see logging from TheiaMCR
     mcr.MCRControl.communicationDebugLevel = True     # be sure to set the class variable, not the instance variable
+    MCR.consoleLogHandler.setLevel(logging.DEBUG)     # However, set the logging level in the instance variable
 
     # move the lens
     log.info('Move the lens using 0x62 or 0x66 depending on direction')
@@ -237,6 +284,7 @@ def viewCommunications(comport:str):
 
     # reset
     mcr.MCRControl.communicationDebugLevel = False
+    MCR.consoleLogHandler.setLevel(logging.INFO)     # Reset the logging level in the instance variable
 
 
 def changeComPathExample(comport:str):
@@ -283,38 +331,14 @@ def serialPortConnectionLose(comport:str, lensType:str='TL1250'):
     #  or check for incremented boardCommunicationRestart variable.
     if mcr.errList.finalError[-1][0] == mcr.errList.ERR_SERIAL_PORT:
         log.error(f'Serial port connection error was created: {mcr.errList.finalError}')
-    log.info(f'Number of automatic reconnections: {MCR.boardCommunicationRestart}')
+    log.info(f'Number of automatic reconnections: {MCR.boardCommunicationRestarts}')
 
 
 if __name__ == '__main__':
     log = logging.getLogger(__name__)
     logging.basicConfig(level=logging.DEBUG, format='%(levelname)-7s ln:%(lineno)-4d %(module)-18s  %(message)s')
 
-    # lens types
-    lensTypes = ['TL410', 'TL1250']
-    # test selection
-    # 1: search com ports and list all connected devices
-    # 2: initialize the board and motors
-    # 3: read and write a motor configuration (steps, speed, etc.)
-    # 4: move motors
-    # 5: turn off PI limit to show moving past PI position
-    # 6: close the background logging file 
-    # 7: close and release resources before exiting a program
-    # 8: (low level) show the byte string communications back and forth to the board 
-    # 9: change the input protocol from USB to UART or I2C 
-    # 10: reconnect to the com port in case of lost connection 
-    
-    runTest = [1]   ### select the test numbers to run (can be multiple)
-    lensType = 1    # 0: 'TL410', 1: 'TL1250'
-    
-    if runTest == []:
-        log.info('Select the tests and set variables in the main program starting at approx line 285 in this file. ')
-        sys.exit(0)
-    if os.name == 'nt':
-        comport = 'COM9'
-    else:
-        comport = '/dev/ttyUSB0'
-        # in Lunux make sure there is permission to access the port (sudo usermod -a -G dialout $USER)
+    comport, runTest, lensType = setup()
 
     if 0 in runTest or len(runTest) == 0:
         log.info('Set the test numbers in the variable "runTest"')

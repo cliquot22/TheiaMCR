@@ -7,6 +7,6 @@ __author__ = 'Mark Peterson'
 __credits__ = 'Theia Technologies'
 
 #from TheiaMCR.TheiaMCR import *
-from .TheiaMCR import MCRControl
+from .TheiaMCR import MCRControl, MCR_REVISION
 from .errList import *
 from .rotatingLogFiles import *
