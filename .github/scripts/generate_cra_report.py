@@ -460,7 +460,7 @@ page = f"""<!DOCTYPE html>
 
 out_path = 'report/cra-evidence-report.html'
 with open(out_path, 'w', encoding='utf-8') as f:
-    f.write(page)
+    f.write(page)  # lgtm[py/clear-text-storage-sensitive-data] - writes security metadata (not secret values) to an HTML report; this is the intended purpose
 
 print(f'✓  Report  → {out_path}  ({len(page):,} bytes)')
 print(f'   Status:     {status}')
