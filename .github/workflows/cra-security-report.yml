@@ -77,8 +77,8 @@ jobs:
 
       - name: Capture installed package versions
         run: |
-          echo "→ Installing package and capturing resolved versions..."
-          pip install . --quiet
+          echo "→ Installing all dependencies and capturing resolved versions..."
+          pip install ".[dev]" --quiet
           pip list --format=json > report/pip-packages.json
           COUNT=$(jq length report/pip-packages.json)
           echo "✓ Captured $COUNT installed packages"

@@ -260,8 +260,12 @@ def sbom_table(pkgs):
         ver      = p.get('versionInfo', '')
         # Supplement with pip-resolved version when SBOM entry lacks one
         if not ver or ver in ('NOASSERTION', 'NONE'):
-            ver = pip_versions.get(raw_name.lower(), '—')
-        ver  = e(ver)
+            lookup = raw_name.lower()
+            ver = pip_versions.get(lookup, '')
+            if not ver:
+                # GitHub SPDX names packages as "com.github.owner/repo" — try just the repo part
+                ver = pip_versions.get(lookup.split('/')[-1], '')
+        ver  = e(ver or '—')
         lic  = e(p.get('licenseConcluded') or p.get('licenseDeclared', ''))
         rows += (f'<tr>'
                  f'<td style="font-size:12px;">{name}</td>'
