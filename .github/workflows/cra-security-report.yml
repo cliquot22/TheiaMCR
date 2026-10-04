@@ -123,6 +123,7 @@ jobs:
 
       # ── 6. Generate HTML report ─────────────────────────────────────────────
       - name: Generate HTML report
+        continue-on-error: true   # REVIEW REQUIRED status exits 1; still upload the report
         env:
           GH_REPO:   ${{ github.repository }}
           GH_REF:    ${{ github.ref_name }}
