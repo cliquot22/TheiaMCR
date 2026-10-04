@@ -1,223 +1,128 @@
 # TheiaMCR Testing - Quick Start Guide
 
-## What Was Created
+### Verified passing checks
+- Fuzz testing for `_sendCmd()` remains stable and passes across malformed inputs and oversized responses.
+- Valid firmware-version parsing now passes for the expected board payload:
+  - `[0x76, 0x05, 0x01, 0x02, 0x03, 0x04, 0x0D]`
+  - expected result: `5.1.2.3.4`
+- Valid serial-number parsing now passes for the expected board payload:
+  - `[0x79, 0x05, 0x50, 0x00, 0x00, 0x80, 0x95, 0x0D]`
+  - expected result: `055-008095`
+- Short error responses are now handled without crashing in `readBoardSN()`.
+
+### Remaining known issues
+The broader error propagation suite still shows open failures in some motor-related code paths. These are tracked as follow-up fixes rather than regressions in the validated parsing behavior.
+
+- `moveRel()` and `home()` can still return `ERR_OK` even when the board reports an error.
+- `multiple_errors_accumulate` is still incomplete.
+- The `_motorInit()` call signature mismatch remains under investigation.
+
+## What the suite covers
 
 ### 1. Fuzz Tests (`test_fuzz_sendCmd.py`)
-- **25 tests** validating `_sendCmd()` robustness
-- Tests command/response overruns, malformed data, exceptions
-- ✅ **All 25 passing**
+- Validates `_sendCmd()` under malformed command bytes, long payloads, weird timing, and exception paths.
+- Confirms the command layer does not crash on bad data.
+- ✅ Verified passing
 
-### 2. Error Propagation Tests (`test_error_handling.py`)
-- **21 tests** checking how functions handle `_sendCmd()` failures
-- Tests error response handling: `[0x74, 0x01, 0x0D]`
-- ⚠️ **10/21 passing** - discovered multiple bugs
+### 2. Response Validation Tests (`test_error_handling.py`)
+- Tests both invalid responses and valid firmware/SN payloads.
+- Covers the HTTP-like board protocol patterns used by the controller.
+- ✅ Valid FW/SN parsing passes
+- ⚠️ Remaining motor error propagation failures still need attention
 
 ### 3. Unified Test Runner (`run_all_tests.py`)
-- Runs all tests with single command
-- Generates timestamped test report files
-- Includes date and MCR version in reports
+- Runs the full suite from one entry point.
+- Generates timestamped files with the current date, platform, Python version, and summary.
+- Useful for tracking regressions over time.
 
-### 4. Test Reports (auto-generated)
-- **Format**: `test_results_YYYYMMDD_HHMMSS.txt`
-- **Location**: `tests/` directory
-- **Contents**: Full test results, failures, errors
+## Running the tests
 
-## Running Tests
-
-### Run Everything
+### Run the full suite
 ```bash
 cd tests
 python run_all_tests.py
 ```
 
-**Output**: Console summary + test report file
-
-### Run Only Fuzz Tests
+### Run only the fuzz tests
 ```bash
 cd tests
-python run_fuzz_tests.py
+python -m unittest test_fuzz_sendCmd -v
 ```
 
-### Run Only Error Propagation Tests
+### Run only the error-handling suite
 ```bash
+cd tests
 python -m unittest test_error_handling -v
 ```
 
-## Test Results Summary
-
-### Current Status (2026-06-30)
-- **Total Tests**: 46
-- **Passing**: 36 (78%)
-- **Failing**: 10 (22%)
-- **MCR Version**: v.3.5.0
-- **Runtime**: <1 second
-
-### Fuzz Tests: ✅ 25/25 Passing
-- Command overruns handled ✓
-- Response overruns handled ✓
-- Exceptions caught properly ✓
-- Timeout logic works ✓
-
-### Error Propagation: ⚠️ 10/21 Passing
-- Found bugs in error handling
-- Some functions don't propagate errors
-- Error logging inconsistent
-
-## Bugs Discovered
-
-### 🔴 Critical: IndexError in readBoardSN()
-**File**: [TheiaMCR.py:1322](../TheiaMCR/TheiaMCR.py#L1322)  
-**Issue**: Crashes when accessing `response[-4]` on short error responses  
-**Test**: `test_readBoardSN_error_response`
-
-**Fix**:
-```python
-# Add length check before accessing array indices
-if response == None or len(response) < 4:
-    MCRControl.log.error("Error: Invalid response")
-    return ''
-```
-
-### 🟡 Medium: readFWRevision() Returns Wrong Value
-**File**: [TheiaMCR.py:~1290](../TheiaMCR/TheiaMCR.py#L1290)  
-**Issue**: Returns `'1'` instead of `''` on error  
-**Test**: `test_readFWRevision_error_response`
-
-**Fix**: Validate response format before parsing
-
-### 🟡 Medium: Motor Functions Don't Propagate Errors
-**Issue**: `moveRel()`, `moveAbs()`, `home()` return success even when `_sendCmd()` fails  
-**Tests**: `test_moveRel_error_response`, `test_moveAbs_error_response`, etc.
-
-**Impact**: Application thinks move succeeded when it failed
-
-### 🟡 Medium: Errors Not Logged
-**Issue**: Failures don't always get logged to `err.finalError`  
-**Test**: `test_error_codes_logged_to_finalError`
-
-## What the Tests Tell You
-
-### Fuzz Tests Answer:
-- ✅ Does `_sendCmd()` crash with bad inputs? **No**
-- ✅ Does it handle oversized commands/responses? **Yes**
-- ✅ Does it catch serial port exceptions? **Yes**
-- ✅ Does timeout logic work? **Yes**
-
-### Error Propagation Tests Answer:
-- ⚠️ Do functions handle `_sendCmd()` errors properly? **Sometimes**
-- ❌ Are errors logged consistently? **No**
-- ⚠️ Do functions return error codes correctly? **Sometimes**
-- ⚠️ Is response validation complete? **No**
-
-## Test Report Files
-
-Each run creates a report in `tests/`:
-
-```
-test_results_20260630_144127.txt
-```
-
-**Contents**:
-- Date, MCR version, Python version
-- Test counts (pass/fail/error/skip)
-- Detailed failure traces
-- Execution time
-
-## Interpreting Test Results
-
-### Console Output
-```
-======================================================================
-TheiaMCR Comprehensive Test Suite
-======================================================================
-Date: 2026-06-30 14:41:27
-MCR Version: v.3.5.0
-======================================================================
-
-Found 46 tests across all test files
-
-... (test execution) ...
-
-======================================================================
-TEST SUMMARY
-======================================================================
-Tests run: 46
-Successes: 36
-Failures: 9
-Errors: 1
-Time elapsed: 0.869 seconds
-
-[FAIL] SOME TESTS FAILED
-[FAIL] Test report saved to: test_results_20260630_144127.txt
-```
-
-### What Each Status Means
-
-- **Success (36)**: Test passed - expected behavior confirmed
-- **Failure (9)**: Test expected different behavior - may indicate bug
-- **Error (1)**: Test couldn't complete - usually code issue
-- **Skip (0)**: Test was skipped
-
-## Next Steps
-
-### 1. Review Bugs
-Read [TEST_SUMMARY.md](TEST_SUMMARY.md) for detailed bug descriptions
-
-### 2. Fix Critical Bugs
-- IndexError in `readBoardSN()`
-- Error parsing in `readFWRevision()`
-
-### 3. Re-run Tests
+### Run the specific valid-response checks
 ```bash
 cd tests
-python run_all_tests.py
+python -m unittest \
+  test_error_handling.TestErrorPropagation.test_readFWRevision_valid_response \
+  test_error_handling.TestErrorPropagation.test_readBoardSN_valid_response -v
 ```
 
-### 4. Check Progress
-Compare new report file to previous ones to track improvements
+## Current known results
 
-### 5. Add to CI/CD
-```yaml
-# GitHub Actions example
-- name: Run TheiaMCR tests
-  run: |
-    cd tests
-    python run_all_tests.py
+### Verified working as expected
+- `_sendCmd()` robustness: pass
+- Valid firmware-version parsing: pass
+- Valid serial-number parsing: pass
+- Short error-response handling in `readBoardSN()`: pass
+
+### Still not fully green
+- Full error propagation suite: partial failures remain
+- Motor-level error propagation: still unreliable in some calls
+- `_motorInit()` compatibility: still failing under current test assumptions
+
+## Key bug fixes already verified
+
+### `readBoardSN()` short-response guard
+The code no longer crashes when the response is too short for the expected payload layout. It returns an empty value and logs the communication error instead of throwing an `IndexError`.
+
+### Valid response parsing
+The valid board payloads are now explicitly checked and match the expected outputs:
+- Firmware version: `5.1.2.3.4`
+- Serial number: `055-008095`
+
+## Recommended next steps
+
+1. Finish the remaining motor error-propagation fixes.
+2. Reconcile `_motorInit()` with the actual function signature.
+3. Re-run the full suite after each fix.
+4. Keep the generated reports in `tests/` as the project’s regression record.
+
+## Test report files
+
+Each run creates a timestamped report under the `tests/` directory, including:
+- date and time
+- MCR version
+- platform and Python version
+- total tests, pass/fail counts
+- failure and error traces
+
+Example:
+```text
+test_results_20260630_152241.txt
 ```
 
-## Documentation Files
+## Documentation set
 
-- **[TEST_SUMMARY.md](TEST_SUMMARY.md)** - Complete test analysis with bug details
-- **[FUZZ_TEST_SUMMARY.md](FUZZ_TEST_SUMMARY.md)** - Fuzz testing documentation
-- **[README_FUZZ_TESTS.md](README_FUZZ_TESTS.md)** - How to add/modify fuzz tests
-- **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Command reference
-- **Test reports** - Auto-generated result files
+- [TEST_SUMMARY.md](TEST_SUMMARY.md)
+- [FUZZ_TEST_SUMMARY.md](FUZZ_TEST_SUMMARY.md)
+- [README_FUZZ_TESTS.md](README_FUZZ_TESTS.md)
+- [QUICK_REFERENCE.md](QUICK_REFERENCE.md)
+- [GETTING_STARTED.md](GETTING_STARTED.md)
 
-## Adding Your Own Tests
+## Notes for future contributors
 
-### Add to Fuzz Tests
-Edit `test_fuzz_sendCmd.py`:
-```python
-def test_my_new_scenario(self):
-    """Test description"""
-    # Setup mock
-    type(self.mock_serial).in_waiting = PropertyMock(return_value=3)
-    self.mock_serial.readline.return_value = bytearray([0x76, 0x00, 0x0D])
-    
-    # Test
-    cmd = bytearray([0x76, 0x0D])
-    response = self.mcr_instance.MCRBoard.com._sendCmd(cmd, waitTime=10)
-    
-    # Assert
-    self.assertEqual(len(response), 3)
-```
+When adding a new regression test, prefer one of these two patterns:
 
-### Add to Error Propagation Tests
-Edit `test_error_handling.py`:
-```python
-def test_my_error_case(self):
-    """Test description"""
-    # Mock error response
+- Valid board response test: confirm the parser returns the exact expected value.
+- Error response test: confirm the function returns an empty/failed result and logs the issue without crashing.
+
+This gives a clear separation between parsing correctness and communication error handling, which is the core of the production behavior for this board interface.
     with patch.object(self.mcr_instance.MCRBoard.com, '_sendCmd', 
                      return_value=bytearray([0x74, 0x01, 0x0D])):
         result = self.mcr_instance.focus.moveRel(100)

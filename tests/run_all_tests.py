@@ -9,8 +9,11 @@ import time
 from datetime import datetime
 import os
 
-# Add parent directory to path to get MCR_REVISION
-sys.path.insert(0, '..')
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Ensure the project root is on the import path so the package resolves correctly
+sys.path.insert(0, PROJECT_ROOT)
 import TheiaMCR as mcr
 
 
@@ -33,9 +36,9 @@ def run_all_tests():
     print("="*70)
     print()
     
-    # Discover and load all tests
+    # Discover and load all tests from the actual tests directory, not the workspace root
     loader = unittest.TestLoader()
-    start_dir = '.'
+    start_dir = TESTS_DIR
     suite = loader.discover(start_dir, pattern='test_*.py')
     
     # Count tests
@@ -43,6 +46,9 @@ def run_all_tests():
     print(f"Found {test_count} tests across all test files")
     print()
     
+    # Capture the test IDs before the runner consumes the suite so the report can list them reliably
+    executed_test_ids = [case.id() for case in collect_test_cases(suite)]
+
     # Run tests with detailed output
     runner = unittest.TextTestRunner(verbosity=2)
     start_time = time.time()
@@ -79,7 +85,7 @@ def run_all_tests():
             print(traceback)
     
     # Generate test report file
-    report_filename = generate_test_report(result, elapsed_time)
+    report_filename = generate_test_report(result, elapsed_time, suite=suite, executed_tests=executed_test_ids)
     
     # Final status
     print("="*70)
@@ -93,31 +99,77 @@ def run_all_tests():
         return 1
 
 
-def generate_test_report(result, elapsed_time):
-    """Generate detailed Markdown test report with bug analysis"""
-    
-    # Create filename with timestamp
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    filename = f"TEST_REPORT_{timestamp}.md"
-    filepath = os.path.join(os.path.dirname(__file__), filename)
-    
-    # Analyze bugs from failures and errors
+def get_product_revision_code(product_name='TheiaMCR'):
+    """Return the CRA revision code for a product name."""
+    codes = {
+        'TheiaMCR': 'TR-002',
+        'TheiaMCR_C': 'TR-003',
+        'lensIQ': 'TR-004',
+    }
+    return codes.get(product_name, 'TR-000')
+
+
+def normalize_version_for_filename(raw_version):
+    """Convert version strings like 'v.3.5.1' to 'v3.5.1'."""
+    if raw_version is None:
+        return 'unknown'
+    version = str(raw_version).strip()
+    if version.lower().startswith('v.'):
+        return 'v' + version[2:]
+    if version.lower().startswith('v') and version[1:2] != '.':
+        return version
+    if version.lower().startswith('v.'):
+        return 'v' + version[2:]
+    return version if version.startswith('v') else f'v{version}'
+
+
+def collect_test_cases(suite):
+    """Flatten a unittest suite into individual test cases."""
+    collected = []
+    tests = getattr(suite, '_tests', [])
+    for test in tests:
+        if test is None:
+            continue
+        if isinstance(test, unittest.TestSuite):
+            collected.extend(collect_test_cases(test))
+        elif hasattr(test, 'id'):
+            collected.append(test)
+    return collected
+
+
+def generate_test_report(result, elapsed_time, suite=None, executed_tests=None):
+    """Generate a detailed Markdown test report with the executed tests listed."""
+    timestamp = datetime.now().strftime('%Y-%m-%d')
+    version = normalize_version_for_filename(get_mcr_revision())
+    report_name = f"CRA-{get_product_revision_code()}_TheiaMCR_{version}_UnitTests_{timestamp}.md"
+    filepath = os.path.join(os.path.dirname(__file__), report_name)
+
     bugs = analyze_bugs(result)
     success_count = result.testsRun - len(result.failures) - len(result.errors)
     pass_rate = (success_count / result.testsRun * 100) if result.testsRun > 0 else 0
-    
+
+    # Build an explicit list of the test functions that ran.
+    if executed_tests is None:
+        executed_tests = []
+        if suite is not None:
+            for case in collect_test_cases(suite):
+                executed_tests.append(case.id())
+        else:
+            executed_tests = [str(test) for test, _ in result.failures + result.errors]
+
     with open(filepath, 'w', encoding='utf-8') as f:
-        # Title and status
         f.write("# TheiaMCR Test Report\n\n")
-        
+
         if result.wasSuccessful():
             f.write("## ✅ ALL TESTS PASSED\n\n")
         else:
             f.write(f"## ⚠️ {len(result.failures) + len(result.errors)} Tests Failed\n\n")
-        
-        # Executive Summary
+
         f.write("## 📊 Executive Summary\n\n")
+        f.write(f"- **Report Name**: `{report_name}`\n")
         f.write(f"- **Date**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write(f"- **Product**: TheiaMCR\n")
+        f.write(f"- **Revision**: {get_product_revision_code()}\n")
         f.write(f"- **MCR Version**: {get_mcr_revision()}\n")
         f.write(f"- **Platform**: {sys.platform}\n")
         f.write(f"- **Total Tests**: {result.testsRun}\n")
@@ -127,75 +179,65 @@ def generate_test_report(result, elapsed_time):
         f.write(f"- **Skipped**: {len(result.skipped)} ⏭️\n")
         f.write(f"- **Pass Rate**: {pass_rate:.1f}%\n")
         f.write(f"- **Runtime**: {elapsed_time:.3f} seconds\n\n")
-        
-        # Bugs Discovered
+
+        f.write("## 🧪 Tests Executed\n\n")
+        f.write("The following test functions were executed in this run:\n\n")
+        for test_id in executed_tests:
+            f.write(f"- `{test_id}`\n")
+        f.write("\n")
+
         if bugs:
             f.write(f"## 🐛 Bugs Discovered ({len(bugs)})\n\n")
             for i, bug in enumerate(bugs, 1):
                 f.write(f"### {i}. {bug['title']}\n\n")
                 f.write(f"**Severity**: {bug['severity']}\n\n")
                 f.write(f"**Issue**: {bug['description']}\n\n")
-                
                 if bug['tests']:
-                    f.write(f"**Failing Tests**:\n")
+                    f.write("**Failing Tests**:\n")
                     for test in bug['tests']:
                         f.write(f"- `{test}`\n")
                     f.write("\n")
-                
                 if bug.get('details'):
                     f.write(f"**Details**: {bug['details']}\n\n")
-                
                 f.write(f"**Impact**: {bug['impact']}\n\n")
                 f.write(f"**Recommendation**: {bug['recommendation']}\n\n")
         else:
             f.write("## ✅ No Bugs Detected\n\n")
             f.write("All tests passing! The code is working as expected.\n\n")
-        
-        # Recommendations
+
         if bugs:
             f.write("## 🎯 Priority Recommendations\n\n")
-            
             critical_bugs = [b for b in bugs if b['severity'] == '🔴 Critical']
             high_bugs = [b for b in bugs if b['severity'] == '🟠 High']
             medium_bugs = [b for b in bugs if b['severity'] == '🟡 Medium']
-            
+
             if critical_bugs:
                 f.write("### Immediate Actions (Critical)\n\n")
                 for bug in critical_bugs:
                     f.write(f"1. **{bug['title']}** - {bug['recommendation']}\n")
                 f.write("\n")
-            
             if high_bugs:
                 f.write("### High Priority\n\n")
                 for bug in high_bugs:
                     f.write(f"- **{bug['title']}** - {bug['recommendation']}\n")
                 f.write("\n")
-            
             if medium_bugs:
                 f.write("### Medium Priority\n\n")
                 for bug in medium_bugs:
                     f.write(f"- {bug['title']}\n")
                 f.write("\n")
-        
-        # Test Details
+
         f.write("## 📋 Test Details\n\n")
-        
-        # Categorize tests
         fuzz_tests = [t for t in result.failures + result.errors if 'fuzz' in str(t[0]).lower()]
         error_tests = [t for t in result.failures + result.errors if 'error' in str(t[0]).lower()]
-        
-        fuzz_pass = result.testsRun - len(result.failures) - len(result.errors)  # Rough estimate
-        if not fuzz_tests and not error_tests:
-            fuzz_pass = result.testsRun
-        
+
         f.write("### Test Categories\n\n")
         f.write("| Category | Status | Count |\n")
         f.write("|----------|--------|-------|\n")
         f.write(f"| Fuzz Tests | {'✅' if not fuzz_tests else '⚠️'} | {0 if not fuzz_tests else len(fuzz_tests)} failed |\n")
         f.write(f"| Error Handling | {'✅' if not error_tests else '⚠️'} | {0 if not error_tests else len(error_tests)} failed |\n")
         f.write("\n")
-        
-        # Failures
+
         if result.failures:
             f.write("### ❌ Test Failures\n\n")
             for test, traceback in result.failures:
@@ -203,8 +245,7 @@ def generate_test_report(result, elapsed_time):
                 f.write("```\n")
                 f.write(traceback)
                 f.write("```\n\n")
-        
-        # Errors
+
         if result.errors:
             f.write("### ⚠️ Test Errors\n\n")
             for test, traceback in result.errors:
@@ -212,15 +253,13 @@ def generate_test_report(result, elapsed_time):
                 f.write("```\n")
                 f.write(traceback)
                 f.write("```\n\n")
-        
-        # Skipped
+
         if result.skipped:
             f.write("### ⏭️ Skipped Tests\n\n")
             for test, reason in result.skipped:
                 f.write(f"- **{test}**: {reason}\n")
             f.write("\n")
-        
-        # Next Steps
+
         if bugs:
             f.write("## 🔄 Next Steps\n\n")
             f.write("1. **Review Critical Bugs** - Address critical severity issues first\n")
@@ -234,13 +273,12 @@ def generate_test_report(result, elapsed_time):
             f.write("1. Adding more edge case tests\n")
             f.write("2. Increasing test coverage\n")
             f.write("3. Adding integration tests\n\n")
-        
-        # Footer
+
         f.write("---\n\n")
         f.write(f"**Report Generated**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
         f.write(f"**MCR Version**: {get_mcr_revision()}\n\n")
         f.write("**Test Command**: `python run_all_tests.py`\n")
-    
+
     print(f"\nDetailed test report saved to: {filepath}")
     return filepath
 

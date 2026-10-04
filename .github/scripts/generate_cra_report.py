@@ -27,11 +27,15 @@ def load(path, default=None):
         return default if default is not None else []
 
 
-sbom     = load('report/sbom.spdx.json', {})
-cs_open  = load('report/code-scanning-open.json')
-cs_dis   = load('report/code-scanning-dismissed.json')
-dep_open = load('report/dependabot-open.json')
-dep_dis  = load('report/dependabot-dismissed.json')
+sbom         = load('report/sbom.spdx.json', {})
+cs_open      = load('report/code-scanning-open.json')
+cs_dis       = load('report/code-scanning-dismissed.json')
+dep_open     = load('report/dependabot-open.json')
+dep_dis      = load('report/dependabot-dismissed.json')
+secrets_open = load('report/secret-scanning-open.json')
+secrets_res  = load('report/secret-scanning-resolved.json')
+pip_pkgs     = load('report/pip-packages.json')
+pip_versions = {p['name'].lower(): p['version'] for p in (pip_pkgs if isinstance(pip_pkgs, list) else [])}
 
 packages  = sbom.get('packages', [])
 pkg_count = len(packages)
@@ -100,11 +104,12 @@ def count_by_sev(alerts, sev_fn):
 cs_counts  = count_by_sev(cs_open,  cs_sev)
 dep_counts = count_by_sev(dep_open, dep_sev)
 
-total_crit = (cs_counts.get('critical', 0) + cs_counts.get('error', 0)
-              + dep_counts.get('critical', 0))
-total_high = cs_counts.get('high', 0) + dep_counts.get('high', 0)
+total_crit    = (cs_counts.get('critical', 0) + cs_counts.get('error', 0)
+                 + dep_counts.get('critical', 0))
+total_high    = cs_counts.get('high', 0) + dep_counts.get('high', 0)
+total_secrets = len(secrets_open)
 
-status  = 'PASS' if (total_crit + total_high) == 0 else 'REVIEW REQUIRED'
+status  = 'PASS' if (total_crit + total_high + total_secrets) == 0 else 'REVIEW REQUIRED'
 st_col  = '#1a7f37' if status == 'PASS' else '#cf222e'
 st_bg   = '#dafbe1' if status == 'PASS' else '#fff0f0'
 st_icon = '✅' if status == 'PASS' else '⚠️'
@@ -251,8 +256,13 @@ def sbom_table(pkgs):
         return f'<table><tbody>{empty_row(3, "No packages in SBOM")}</tbody></table>'
     rows = ''
     for p in pkgs[:100]:
-        name = e(p.get('name', ''))
-        ver  = e(p.get('versionInfo', '—'))
+        raw_name = p.get('name', '')
+        name     = e(raw_name)
+        ver      = p.get('versionInfo', '')
+        # Supplement with pip-resolved version when SBOM entry lacks one
+        if not ver or ver in ('NOASSERTION', 'NONE'):
+            ver = pip_versions.get(raw_name.lower(), '—')
+        ver  = e(ver)
         lic  = e(p.get('licenseConcluded') or p.get('licenseDeclared', ''))
         rows += (f'<tr>'
                  f'<td style="font-size:12px;">{name}</td>'
@@ -268,6 +278,32 @@ def sbom_table(pkgs):
             f'<tbody>{rows}</tbody></table>')
 
 
+def secrets_table(alerts):
+    if not alerts:
+        return f'<table><tbody>{empty_row(6, "No secret scanning alerts")}</tbody></table>'
+    rows = ''
+    for a in alerts:
+        num         = a.get('number', '')
+        secret_type = e(a.get('secret_type_display_name') or a.get('secret_type', ''))
+        state       = e(a.get('state', ''))
+        resolution  = e(a.get('resolution') or '—')
+        bypassed    = '⚠️ Yes' if a.get('push_protection_bypassed') else 'No'
+        url         = e(a.get('html_url', '#'))
+        created     = e((a.get('created_at') or '')[:10])
+        rows += (f'<tr>'
+                 f'<td><a href="{url}">#{num}</a></td>'
+                 f'<td style="font-size:12px;">{secret_type}</td>'
+                 f'<td style="font-size:12px;">{state}</td>'
+                 f'<td style="font-size:12px;">{resolution}</td>'
+                 f'<td style="font-size:12px;">{bypassed}</td>'
+                 f'<td style="font-size:11px;color:#57606a;">{created}</td>'
+                 f'</tr>')
+    return (f'<table>'
+            f'<thead><tr><th>#</th><th>Secret Type</th><th>State</th>'
+            f'<th>Resolution</th><th>Push Protection Bypassed</th><th>Detected</th></tr></thead>'
+            f'<tbody>{rows}</tbody></table>')
+
+
 # ── Page sections ──────────────────────────────────────────────────────────────
 
 meta_items = [
@@ -277,6 +313,7 @@ meta_items = [
     ('Scan Date',     e(date)),
     ('Actions Run',   f'<a href="{e(run_url)}">{e(run_id)}</a>'),
     ('SBOM Packages', str(pkg_count)),
+    ('Open Secrets',  str(total_secrets)),
 ]
 meta_html = ''.join(
     f'<div class="meta-box">'
@@ -300,6 +337,10 @@ controls_html = ''.join(
     for c in controls
 )
 
+_sec_bg  = '#ffeef0' if secrets_open else '#dafbe1'
+_sec_col = '#cf222e' if secrets_open else '#1a7f37'
+_sec_msg = (f'⚠️ {len(secrets_open)} exposed secret(s) require immediate remediation.'
+            if secrets_open else '✓ No exposed secrets detected.')
 cs_summary = (
     f'<div style="margin-bottom:16px;">'
     f'<div class="sev-label">Code Scanning (SAST — CodeQL) · {len(cs_open)} open alerts</div>'
@@ -310,7 +351,7 @@ cs_summary = (
         ('Low / Note', ['low', 'note']),
     ]) +
     f'</div>'
-    f'<div>'
+    f'<div style="margin-bottom:16px;">'
     f'<div class="sev-label">Dependency Vulnerabilities (SCA — Dependabot) · {len(dep_open)} open alerts</div>'
     + count_grid(dep_counts, [
         ('Critical', ['critical']),
@@ -319,11 +360,21 @@ cs_summary = (
         ('Low',      ['low']),
     ]) +
     f'</div>'
+    f'<div>'
+    f'<div class="sev-label">Secret Scanning · {len(secrets_open)} open · {len(secrets_res)} resolved</div>'
+    f'<div style="padding:10px 14px;background:{_sec_bg};border-radius:4px;'
+    f'color:{_sec_col};font-size:13px;">{_sec_msg}</div>'
+    f'</div>'
 )
 
-status_msg = ('No critical or high severity open alerts detected.'
-              if status == 'PASS'
-              else f'{total_crit} critical · {total_high} high severity alerts require remediation.')
+if status == 'PASS':
+    status_msg = 'No critical or high severity alerts, or exposed secrets, detected.'
+else:
+    _parts = []
+    if total_crit:    _parts.append(f'{total_crit} critical')
+    if total_high:    _parts.append(f'{total_high} high severity')
+    if total_secrets: _parts.append(f'{total_secrets} exposed secret(s)')
+    status_msg = f'{" · ".join(_parts)} require immediate remediation.'
 
 
 # ── Assemble final HTML ────────────────────────────────────────────────────────
@@ -380,6 +431,12 @@ page = f"""<!DOCTYPE html>
   {card('Dependabot — Dismissed &nbsp;<span style="font-size:12px;font-weight:400;color:#57606a;">Audit Trail</span>',
         dep_table(dep_dis), count=len(dep_dis), padding=False)}
 
+  {card('Secret Scanning — Open &nbsp;<span style="font-size:12px;font-weight:400;color:#57606a;">CRA §2(3) Secrets Evidence</span>',
+        secrets_table(secrets_open), count=len(secrets_open), padding=False)}
+
+  {card('Secret Scanning — Resolved &nbsp;<span style="font-size:12px;font-weight:400;color:#57606a;">Audit Trail</span>',
+        secrets_table(secrets_res), count=len(secrets_res), padding=False)}
+
   {card(f'SBOM — Software Bill of Materials &nbsp;<span style="font-size:12px;font-weight:400;color:#57606a;">CRA Annex I Part II §1</span>',
         sbom_table(packages), count=f'{pkg_count} packages', padding=False)}
 
@@ -392,7 +449,7 @@ page = f"""<!DOCTYPE html>
     Article 14 reporting obligations from <strong>11 September 2026</strong>.
     Retain in product technical file alongside the SBOM (sbom.spdx.json).
     This report does not constitute legal advice.<br><br>
-    <strong>Evidence chain:</strong> Dependency Graph (SBOM) · CodeQL SAST · Dependabot SCA ·
+    <strong>Evidence chain:</strong> Dependency Graph (SBOM) · CodeQL SAST · Dependabot SCA · Secret Scanning ·
     <a href="{e(run_url)}">Actions run {e(run_id)}</a> ·
     Generated {e(date)} · Commit {e(sha)} · Ref {e(ref)}
   </div>
@@ -410,6 +467,7 @@ print(f'   Status:     {status}')
 print(f'   SBOM:       {pkg_count} packages')
 print(f'   CodeQL:     {len(cs_open)} open  /  {len(cs_dis)} dismissed')
 print(f'   Dependabot: {len(dep_open)} open  /  {len(dep_dis)} dismissed')
+print(f'   Secrets:    {len(secrets_open)} open  /  {len(secrets_res)} resolved')
 
 if status != 'PASS':
     sys.exit(1)   # fail the workflow step if critical/high alerts are open

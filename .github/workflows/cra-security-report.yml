@@ -24,7 +24,7 @@ on:
 
 permissions:
   contents: write          # attach files to releases; read repository
-  security-events: read   # read CodeQL and Dependabot alerts
+  security-events: read   # read CodeQL, Dependabot, and secret scanning alerts
 
 jobs:
   cra-evidence:
@@ -64,7 +64,21 @@ jobs:
             echo "✗ SBOM unavailable (HTTP $HTTP) — dependency graph may not be enabled"
           fi
 
-      # ── 2. CodeQL SAST alerts (CRA §2(3) evidence) ──────────────────────────
+      # ── 2. Set up Python & capture installed package versions ──────────────────
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Capture installed package versions
+        run: |
+          echo "→ Installing package and capturing resolved versions..."
+          pip install . --quiet
+          pip list --format=json > report/pip-packages.json
+          COUNT=$(jq length report/pip-packages.json)
+          echo "✓ Captured $COUNT installed packages"
+
+      # ── 3. CodeQL SAST alerts (CRA §2(3) evidence) ──────────────────────────
       - name: Export code scanning alerts
         run: |
           echo "→ Fetching code scanning alerts..."
@@ -79,7 +93,7 @@ jobs:
           echo "✓ Code scanning: $(jq length report/code-scanning-open.json) open," \
             "$(jq length report/code-scanning-dismissed.json) dismissed"
 
-      # ── 3. Dependabot SCA alerts (CRA §2(3) evidence) ───────────────────────
+      # ── 4. Dependabot SCA alerts (CRA §2(3) evidence) ───────────────────────
       - name: Export Dependabot alerts
         run: |
           echo "→ Fetching Dependabot alerts..."
@@ -93,7 +107,21 @@ jobs:
           echo "✓ Dependabot: $(jq length report/dependabot-open.json) open," \
             "$(jq length report/dependabot-dismissed.json) dismissed"
 
-      # ── 4. Generate HTML report ─────────────────────────────────────────────
+      # ── 5. Secret scanning alerts (CRA §2(3) evidence) ──────────────────────
+      - name: Export secret scanning alerts
+        run: |
+          echo "→ Fetching secret scanning alerts..."
+          for STATE in open resolved; do
+            gh api --paginate \
+              "repos/$REPO/secret-scanning/alerts?state=$STATE&per_page=100" \
+              --jq '.[]' 2>/dev/null \
+              | jq -s '.' > report/secret-scanning-${STATE}.json \
+              || echo '[]' > report/secret-scanning-${STATE}.json
+          done
+          echo "✓ Secret scanning: $(jq length report/secret-scanning-open.json) open," \
+            "$(jq length report/secret-scanning-resolved.json) resolved"
+
+      # ── 6. Generate HTML report ─────────────────────────────────────────────
       - name: Generate HTML report
         env:
           GH_REPO:   ${{ github.repository }}
@@ -102,7 +130,7 @@ jobs:
           GH_RUN_ID: ${{ github.run_id }}
         run: python3 .github/scripts/generate_cra_report.py
 
-      # ── 5. Upload evidence bundle (retained 1 year) ──────────────────────────
+      # ── 7. Upload evidence bundle (retained 1 year) ──────────────────────────
       - name: Upload evidence bundle
         uses: actions/upload-artifact@v4
         with:
@@ -110,9 +138,9 @@ jobs:
           path: report/
           retention-days: 365
 
-      # ── 6. Attach to release (HTML report + SBOM JSON) ──────────────────────
+      # ── 8. Attach to release (HTML report + SBOM JSON) ──────────────────────
       - name: Attach to release
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.ref_type == 'tag')
         run: |
           gh release upload "${{ github.ref_name }}" \
             report/cra-evidence-report.html \
