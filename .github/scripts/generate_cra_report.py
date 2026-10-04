@@ -14,6 +14,11 @@ import json
 import html as html_lib
 import datetime
 import os
+import re
+import sys
+
+
+_ver_constraint = re.compile(r'^[><=!~^]')  # detects version specifiers like >=61.0
 
 
 # ── Data loading ───────────────────────────────────────────────────────────────
@@ -258,8 +263,8 @@ def sbom_table(pkgs):
         raw_name = p.get('name', '')
         name     = e(raw_name)
         ver      = p.get('versionInfo', '')
-        # Supplement with pip-resolved version when SBOM entry lacks one
-        if not ver or ver in ('NOASSERTION', 'NONE'):
+        # Supplement with pip-resolved version when SBOM entry lacks one or only has a constraint
+        if not ver or ver in ('NOASSERTION', 'NONE') or _ver_constraint.match(ver):
             lookup = raw_name.lower()
             ver = pip_versions.get(lookup, '')
             if not ver:

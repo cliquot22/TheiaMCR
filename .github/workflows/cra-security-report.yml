@@ -142,7 +142,7 @@ jobs:
         with:
           name: cra-evidence-${{ github.ref_name }}-${{ github.run_number }}
           path: report/
-          retention-days: 365
+          retention-days: 90
 
       # ── 8. Attach to release (HTML report + SBOM JSON) ──────────────────────
       - name: Attach to release
