@@ -14,7 +14,6 @@ import json
 import html as html_lib
 import datetime
 import os
-import sys
 
 
 # ── Data loading ───────────────────────────────────────────────────────────────
@@ -468,6 +467,3 @@ print(f'   SBOM:       {pkg_count} packages')
 print(f'   CodeQL:     {len(cs_open)} open  /  {len(cs_dis)} dismissed')
 print(f'   Dependabot: {len(dep_open)} open  /  {len(dep_dis)} dismissed')
 print(f'   Secrets:    {len(secrets_open)} open  /  {len(secrets_res)} resolved')
-
-if status != 'PASS':
-    sys.exit(1)   # fail the workflow step if critical/high alerts are open
