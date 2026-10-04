@@ -97,6 +97,16 @@ def dep_sev(a):
     return (a.get('security_advisory', {}).get('severity') or 'unknown').lower()
 
 
+def valid_dep(a):
+    """True only for Dependabot alerts with meaningful content."""
+    return isinstance(a, dict) and bool(a.get('number') or a.get('security_advisory'))
+
+
+def valid_secret(a):
+    """True only for secret scanning alerts with meaningful content."""
+    return isinstance(a, dict) and bool(a.get('number') or a.get('secret_type'))
+
+
 def count_by_sev(alerts, sev_fn):
     counts = {}
     for a in alerts:
@@ -105,13 +115,19 @@ def count_by_sev(alerts, sev_fn):
     return counts
 
 
+# Filter out ghost/empty alert objects the GitHub API sometimes returns
+dep_open_valid    = [a for a in dep_open    if valid_dep(a)]
+dep_dis_valid     = [a for a in dep_dis     if valid_dep(a)]
+secrets_open_valid = [a for a in secrets_open if valid_secret(a)]
+secrets_res_valid  = [a for a in secrets_res  if valid_secret(a)]
+
 cs_counts  = count_by_sev(cs_open,  cs_sev)
-dep_counts = count_by_sev(dep_open, dep_sev)
+dep_counts = count_by_sev(dep_open_valid, dep_sev)
 
 total_crit    = (cs_counts.get('critical', 0) + cs_counts.get('error', 0)
                  + dep_counts.get('critical', 0))
 total_high    = cs_counts.get('high', 0) + dep_counts.get('high', 0)
-total_secrets = len(secrets_open)
+total_secrets = len(secrets_open_valid)
 
 status  = 'PASS' if (total_crit + total_high + total_secrets) == 0 else 'REVIEW REQUIRED'
 st_col  = '#1a7f37' if status == 'PASS' else '#cf222e'
@@ -345,10 +361,10 @@ controls_html = ''.join(
     for c in controls
 )
 
-_sec_bg  = '#ffeef0' if secrets_open else '#dafbe1'
-_sec_col = '#cf222e' if secrets_open else '#1a7f37'
-_sec_msg = (f'⚠️ {len(secrets_open)} exposed secret(s) require immediate remediation.'
-            if secrets_open else '✓ No exposed secrets detected.')
+_sec_bg  = '#ffeef0' if secrets_open_valid else '#dafbe1'
+_sec_col = '#cf222e' if secrets_open_valid else '#1a7f37'
+_sec_msg = (f'⚠️ {len(secrets_open_valid)} exposed secret(s) require immediate remediation.'
+            if secrets_open_valid else '✓ No exposed secrets detected.')
 cs_summary = (
     f'<div style="margin-bottom:16px;">'
     f'<div class="sev-label">Code Scanning (SAST — CodeQL) · {len(cs_open)} open alerts</div>'
@@ -360,7 +376,7 @@ cs_summary = (
     ]) +
     f'</div>'
     f'<div style="margin-bottom:16px;">'
-    f'<div class="sev-label">Dependency Vulnerabilities (SCA — Dependabot) · {len(dep_open)} open alerts</div>'
+    f'<div class="sev-label">Dependency Vulnerabilities (SCA — Dependabot) · {len(dep_open_valid)} open alerts</div>'
     + count_grid(dep_counts, [
         ('Critical', ['critical']),
         ('High',     ['high']),
@@ -369,7 +385,7 @@ cs_summary = (
     ]) +
     f'</div>'
     f'<div>'
-    f'<div class="sev-label">Secret Scanning · {len(secrets_open)} open · {len(secrets_res)} resolved</div>'
+    f'<div class="sev-label">Secret Scanning · {len(secrets_open_valid)} open · {len(secrets_res_valid)} resolved</div>'
     f'<div style="padding:10px 14px;background:{_sec_bg};border-radius:4px;'
     f'color:{_sec_col};font-size:13px;">{_sec_msg}</div>'
     f'</div>'
@@ -434,16 +450,16 @@ page = f"""<!DOCTYPE html>
         cs_table(cs_dis), count=len(cs_dis), padding=False)}
 
   {card('Dependabot — Open &nbsp;<span style="font-size:12px;font-weight:400;color:#57606a;">CRA §2(3) SCA Evidence</span>',
-        dep_table(dep_open), count=len(dep_open), padding=False)}
+        dep_table(dep_open_valid), count=len(dep_open_valid), padding=False)}
 
   {card('Dependabot — Dismissed &nbsp;<span style="font-size:12px;font-weight:400;color:#57606a;">Audit Trail</span>',
-        dep_table(dep_dis), count=len(dep_dis), padding=False)}
+        dep_table(dep_dis_valid), count=len(dep_dis_valid), padding=False)}
 
   {card('Secret Scanning — Open &nbsp;<span style="font-size:12px;font-weight:400;color:#57606a;">CRA §2(3) Secrets Evidence</span>',
-        secrets_table(secrets_open), count=len(secrets_open), padding=False)}
+        secrets_table(secrets_open_valid), count=len(secrets_open_valid), padding=False)}
 
   {card('Secret Scanning — Resolved &nbsp;<span style="font-size:12px;font-weight:400;color:#57606a;">Audit Trail</span>',
-        secrets_table(secrets_res), count=len(secrets_res), padding=False)}
+        secrets_table(secrets_res_valid), count=len(secrets_res_valid), padding=False)}
 
   {card(f'SBOM — Software Bill of Materials &nbsp;<span style="font-size:12px;font-weight:400;color:#57606a;">CRA Annex I Part II §1</span>',
         sbom_table(packages), count=f'{pkg_count} packages', padding=False)}
@@ -474,5 +490,5 @@ print(f'✓  Report  → {out_path}  ({len(page):,} bytes)')
 print(f'   Status:     {status}')
 print(f'   SBOM:       {pkg_count} packages')
 print(f'   CodeQL:     {len(cs_open)} open  /  {len(cs_dis)} dismissed')
-print(f'   Dependabot: {len(dep_open)} open  /  {len(dep_dis)} dismissed')
-print(f'   Secrets:    {len(secrets_open)} open  /  {len(secrets_res)} resolved')
+print(f'   Dependabot: {len(dep_open_valid)} open  /  {len(dep_dis_valid)} dismissed')
+print(f'   Secrets:    {len(secrets_open_valid)} open  /  {len(secrets_res_valid)} resolved')
