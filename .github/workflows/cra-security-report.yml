@@ -20,7 +20,12 @@ name: CRA Security Evidence Report
 on:
   release:
     types: [published]    # runs automatically when you publish a release
-  workflow_dispatch:       # also available as a manual trigger from the Actions tab
+  workflow_dispatch:       # manual trigger from the Actions tab
+    inputs:
+      release_tag:
+        description: 'Release tag to attach report to (e.g. v3.5.1). Run from main — leave empty to skip attachment.'
+        required: false
+        default: ''
 
 permissions:
   contents: write          # attach files to releases; read repository
@@ -141,10 +146,14 @@ jobs:
 
       # ── 8. Attach to release (HTML report + SBOM JSON) ──────────────────────
       - name: Attach to release
-        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.ref_type == 'tag')
+        if: |
+          github.event_name == 'release' ||
+          (github.event_name == 'workflow_dispatch' &&
+           (github.ref_type == 'tag' || inputs.release_tag != ''))
         run: |
-          gh release upload "${{ github.ref_name }}" \
+          TAG="${{ inputs.release_tag || github.ref_name }}"
+          gh release upload "$TAG" \
             report/cra-evidence-report.html \
             report/sbom.spdx.json \
             --clobber
-          echo "✓ Evidence attached to release ${{ github.ref_name }}"
+          echo "✓ Evidence attached to release $TAG"
