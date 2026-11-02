@@ -1,5 +1,8 @@
 # Quick Reference: Fuzz Testing Commands
 
+Commands for the `_sendCmd()` fuzz tests only.  To run the full test suite and create the CRA test report,
+see [README_ALL_TESTS.md](README_ALL_TESTS.md).
+
 ## Run All Fuzz Tests
 ```bash
 cd tests
@@ -61,28 +64,19 @@ Time elapsed: 0.807 seconds
 [PASS] _sendCmd is robust against fuzz inputs
 ```
 
-## Bug Found: Zero-Length Command
+## Bug Found: Zero-Length Command (fixed in v.3.5.1)
 
-**File**: TheiaMCR/TheiaMCR.py, line ~1546  
-**Issue**: `IndexError` when accessing `cmd[0]` on empty command  
-**Test**: `test_command_zero_length` (expects IndexError)
+**Issue**: `_sendCmd()` raised `IndexError` when accessing `cmd[0]` on an empty command  
+**Fix**: `_sendCmd()` now checks for an empty command first and returns the error response `[0x74, 0x01, 0x0D]`  
+**Test**: `test_command_zero_length` (expects the error response)
 
-### Fix:
-```python
-# BEFORE (buggy):
-if cmd[0] == 0x6B:
-
-# AFTER (fixed):
-if len(cmd) > 0 and cmd[0] == 0x6B:
-```
-
-## Files Created
+## Files
 
 1. `tests/test_fuzz_sendCmd.py` - 25 fuzz tests
-2. `tests/run_fuzz_tests.py` - Test runner
-3. `tests/README_FUZZ_TESTS.md` - Detailed documentation
-4. `tests/FUZZ_TEST_SUMMARY.md` - This summary
-5. `tests/QUICK_REFERENCE.md` - This reference card
+2. `tests/run_fuzz_tests.py` - Fuzz test runner
+3. [README_FUZZ_TESTS.md](README_FUZZ_TESTS.md) - Detailed fuzz test documentation
+4. [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - This reference card
+5. [README_ALL_TESTS.md](README_ALL_TESTS.md) - Full test suite, test reports, and CRA documentation steps
 
 ## Test Categories
 
@@ -207,7 +201,7 @@ python -m unittest tests.test_fuzz_sendCmd
 
 ## Resources
 
-- Full documentation: `README_FUZZ_TESTS.md`
-- Summary: `FUZZ_TEST_SUMMARY.md`
+- Full fuzz test documentation: [README_FUZZ_TESTS.md](README_FUZZ_TESTS.md)
+- Full test suite and CRA test report: [README_ALL_TESTS.md](README_ALL_TESTS.md)
 - Source code: `test_fuzz_sendCmd.py`
 - Test runner: `run_fuzz_tests.py`

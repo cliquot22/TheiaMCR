@@ -1,4 +1,21 @@
 # revision history
+    v.3.5.2 261005 bug: unhandled exception hook no longer hides exceptions when logging is not configured (prints standard traceback)
+                log message identifies whether the exception came from TheiaMCR or the calling program
+                KeyboardInterrupt passed to the default exception hook
+                bug: close() did not close the serial port after a successful connection (initialized == 0 was treated as False)
+                bug: Windows com port names are case insensitive ("com10" = "COM10"), port name is normalized to upper case for the instance cache
+                bug: calling MCRControl() again for an initialized port reset the motors to MCRInitFailed
+                added Examples.py with interactive console selection of USB com port, lens type, and tests
+                added input parameter checks to the public functions (CRA PY-02) (is number, is bool, is in range)
+                setRespectLimits() keeps the current state if the input is not True/False (None turned the limits off)
+                writeMotorSetup() checks the inputs before writing to the board EEPROM
+                bug: setCommunicationPath() did not range check an integer path (out of range values were sent to the board or crashed)
+                readFWRevision() checks the first (0x76) and last (0x0D) bytes of the reply as well as the length
+                bug: __init__() crashed (ValueError) when the board did not reply or a different device replied, now initialization fails with an error
+                bug: _verifyCommunication() never recognized a valid firmware reply so it reopened the serial port on every check
+                bug: checkBoardCommunication() returned False for an open port (initialized == 0 was treated as False)
+                added unit tests for input validation (PY-02) and no unintended motor movement (PY-11) using a byte-level mock board
+                updated README.md file
     v.3.5.1 260630 created fuzz test plan and error propogation tests. 
                 bug: _sendCmd() check for 0-length command 
                 bugs: fixed some error propogation if _sendCmd() returns an error 

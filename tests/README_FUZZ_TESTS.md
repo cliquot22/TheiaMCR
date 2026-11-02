@@ -1,5 +1,8 @@
 # Fuzz Testing for TheiaMCR._sendCmd
 
+For the full test suite (all test files, the CRA test report, and what to update after a run), see
+[README_ALL_TESTS.md](README_ALL_TESTS.md).  For a list of fuzz test commands, see [QUICK_REFERENCE.md](QUICK_REFERENCE.md).
+
 ## Overview
 
 This fuzz testing suite validates the robustness of the `_sendCmd` function in TheiaMCR.py against:

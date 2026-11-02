@@ -9,7 +9,7 @@ from pathlib import Path
 
 class TestCRAReportScript(unittest.TestCase):
     def test_review_required_does_not_fail_script(self):
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = Path(__file__).resolve().parents[2]
         script = repo_root / ".github" / "scripts" / "generate_cra_report.py"
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -39,6 +39,7 @@ class TestCRAReportScript(unittest.TestCase):
                     "GH_REF": "v0.0.0-test",
                     "GH_SHA": "0123456789abcdef",
                     "GH_RUN_ID": "1",
+                    "PYTHONIOENCODING": "utf-8",
                 }
             )
 
@@ -48,6 +49,7 @@ class TestCRAReportScript(unittest.TestCase):
                 env=env,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
             )
 
             self.assertEqual(run.returncode, 0, msg=run.stdout + run.stderr)

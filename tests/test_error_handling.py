@@ -399,19 +399,28 @@ class TestSerialPortFailure(unittest.TestCase):
             pass
     
     def test_serial_exception_during_operation(self):
-        """Test that serial exceptions are caught and handled"""
-        # Mock _sendCmd to raise serial exception
-        # Note: Exceptions may not propagate up - _sendCmd catches them
-        with patch.object(self.mcr_instance.MCRBoard.com, '_sendCmd', 
-                         side_effect=serial.SerialException("Port disconnected")):
-            try:
-                result = self.mcr_instance.focus.moveRel(100)
-                # If we get here, exception was caught - that's valid behavior
-                self.assertIsInstance(result, int)
-            except serial.SerialException:
-                # If exception propagates, that's also valid behavior
-                pass
-    
+        """Test that a serial exception on write is caught and moveRel returns an error (PY-10)"""
+        # the serial port raises on write (USB cable unplugged) and can't be reopened.  The real _sendCmd runs so the
+        # exception must be caught in the module and not reach the calling program
+        self.mock_serial.write.side_effect = serial.SerialException("Port disconnected")
+        with patch('serial.Serial', side_effect=serial.SerialException("could not open port")):
+            result = self.mcr_instance.focus.moveRel(100)
+
+        self.assertEqual(result, err.ERR_BAD_MOVE)
+        self.assertEqual(self.mcr_instance.focus.currentStep, 0)
+        self.assertFalse(self.mcr_instance.boardCommunicationState)
+        self.assertTrue(self.mock_serial.write.called)
+
+    def test_serial_exception_while_waiting_for_reply(self):
+        """Test that a serial exception after the command is sent (mid-command) is caught (PY-10)"""
+        type(self.mock_serial).in_waiting = PropertyMock(side_effect=serial.SerialException("Port disconnected"))
+        with patch('serial.Serial', side_effect=serial.SerialException("could not open port")):
+            result = self.mcr_instance.focus.moveRel(100)
+
+        self.assertEqual(result, err.ERR_BAD_MOVE)
+        self.assertEqual(self.mcr_instance.focus.currentStep, 0)
+        self.assertFalse(self.mcr_instance.boardCommunicationState)
+
     def test_communication_recovery_attempt(self):
         """Test that system can recover after communication errors"""
         # First call may or may not fail depending on error response handling

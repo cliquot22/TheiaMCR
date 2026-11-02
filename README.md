@@ -17,6 +17,8 @@ MCR = TheiaMCR.MCRControl(comport)
 ``` 
 Note: `MCRControl` uses a singleton pattern — calling it a second time with the same port name returns the existing instance rather than creating a new one.  A second board can be controlled through a different port.  
 
+> **Thread safety:** TheiaMCR is not thread-safe.  Each command waits for the board's reply, and calls made from more than one thread at the same time can mix up commands and replies on the serial port.  Call the module from one thread, or protect all calls with your own lock (e.g. `threading.Lock`).  Only one program should open the board's com port at a time; Windows blocks a second program from opening the port, but Linux does not by default.  
+
 After a succesful board initialization, the motors must all be initialized with their steps and limit positions.  
 ``` 
 # initialize the motors (Theia TL1250P N6 lens parameters shown in this case)
@@ -66,7 +68,7 @@ Each motor (focus, zoom, iris) supports these functions:
 - `motor.home()`: move motor to the PI limit switch home position
 - `motor.moveAbs(step)`: move to an absolute step number
 - `motor.moveRel(steps, correctForBL=True)`: move by a relative number of steps with optional backlash correction
-- `motor.setMotorSpeed(speed)`: set the motor speed in pps (focus/zoom: 100–1500; iris: 10–200)
+- `motor.setMotorSpeed(speed)`: set the motor speed in pps (focus/zoom: 200–2000; iris: 10–200)
 - `motor.setHomingSpeed(speed)`: set the speed in pps used when homing
 - `motor.setRespectLimits(state)`: enable (`True`) or disable (`False`) enforcement of the PI limit position
 - `motor.readMotorSetup()`: read motor configuration from board EEPROM
@@ -99,6 +101,8 @@ There are logging commands in the module using Python's logging libray.  These a
 The module creates 2 rotating log files in the background by default based on Python's logging module.  If the logging module isn't used, the log files can be disabled by calling `MCR = TheiaMCR.MCRControl("com4", logFiles=False)`.  
 
 Unhandled exceptions are logged to the log file using the `sys.excepthook` variable.  This is a global variable so check the operation within your application if you set this variable elsewhere.  
+
+The error list variable records every error received.  These can be printed to the console with `error.printErrorListToLog`.  It continues to save errors and grow in memoroy until `error.clearErrorList()` is called.  
 
 # License
 [Theia Technologies BSD-3-Clause license](https://github.com/cliquot22/TheiaMCR/blob/main/LICENSE)  
