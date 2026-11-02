@@ -129,18 +129,22 @@ technical file.
 2. **History:** add the changes to `history.txt`, including any change in test results or new tests.
 3. **Final test run:** run `python tests/run_all_tests.py`.  All tests should pass.  If a failure is
    accepted for this release, record why in the CRA risk assessment (step 8).
-4. **Commit the report:** commit the new `CRA-TR-002_..._UnitTests_<date>.md` file in `tests/` with the
-   release, and push everything to `main`.  Keep the older reports; they are the regression history.
+4. **Push the code:** commit the changes and push everything to `main`.  The test report is not committed:
+   `tests/CRA-TR-*.md` is in `.gitignore` because the repository is public.  The report is attached to the
+   GitHub release in step 5 and archived in the CRA technical file in step 9.  Keep the older reports in the
+   evidence folder; they are the regression history.
 
 ### Publishing the GitHub release
 5. **Create the release** from the pushed `main` commit, on GitHub or with the GitHub CLI:
    - **GitHub:** *Releases* → *Draft a new release* → *Choose a tag*, type the new tag (e.g. `v3.5.2`, no dot
      after the `v`, matching the earlier tags) and create it on publish, target `main` → title (e.g.
-     `v3.5.2`) → paste this version's lines from `history.txt` as the release notes → *Publish release*.
-   - **GitHub CLI:**
+     `v3.5.2`) → paste this version's lines from `history.txt` as the release notes → drag the unit test
+     report from step 3 into *Attach binaries* → *Publish release*.
+   - **GitHub CLI** (the report file is attached to the release):
      ```bash
-     gh release create v3.5.2 --target main --title "v3.5.2" --notes "<this version's lines from history.txt>"
+     gh release create v3.5.2 tests/CRA-TR-002_TheiaMCR_v3.5.2_UnitTests_<date>.md --target main --title "v3.5.2" --notes "<this version's lines from history.txt>"
      ```
+   Attach only an all-pass report: the release is public.
    A saved draft does not start the CRA workflow; it runs only when the release is published.
 6. **Upload to PyPI** from the same commit:
    ```bash
@@ -161,8 +165,8 @@ technical file.
 ### Updating the CRA documents
 8. **Update the risk assessment (CRA-RA-002):**
    - **Section 3, test catalog:** fill in Result, Version & Date Tested, and Evidence Reference.
-     - PY-01, PY-02, PY-03, PY-10, PY-11: the unit test report from step 4.
-     - PY-16: the unit test report for cases (a) and (b), plus the manual test record for case (c).
+     - PY-01, PY-02, PY-03, PY-10, PY-11: the unit test report from step 3 (attached to the GitHub release).
+     - PY-16: the unit test report from step 3 for cases (a) and (b), plus the manual test record for case (c).
      - PY-04, PY-05, PY-07: `cra-evidence-report.html` on the GitHub release (include the Actions run number).
      - PY-06: the SBOM JSON file on the GitHub release and the CRA SBOM document.
      - Manual review items (PY-08, PY-09, PY-12, PY-13, PY-15): record who reviewed what, on which

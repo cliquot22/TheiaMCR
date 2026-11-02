@@ -11,3 +11,4 @@ TheiaMCR.test
 .venv
 .vscode
 todo*
+tests/CRA-TR-*.md
