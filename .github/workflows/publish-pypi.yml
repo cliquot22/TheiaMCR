@@ -1,0 +1,103 @@
+# .github/workflows/publish-pypi.yml
+#
+# Builds TheiaMCR and publishes it to PyPI with trusted publishing (no API token) when a GitHub release is
+# published, then checks the published files and attaches the integrity report to the release (CRA-RA-002 PY-08).
+#
+# One-time setup on PyPI (project TheiaMCR → Settings → Publishing → Add a new publisher → GitHub):
+#   Owner: cliquot22    Repository: TheiaMCR    Workflow name: publish-pypi.yml    Environment name: pypi
+#
+# Actions are pinned to a commit (PY-09); the version is in the comment.
+
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build distribution
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0   # v7.1.0
+        with:
+          python-version: '3.x'
+
+      # stop before publishing if the release tag, pyproject.toml and MCR_REVISION don't agree
+      - name: Check version numbers
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          PROJECT_VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml)
+          MODULE_VERSION=$(sed -n "s/^MCR_REVISION = 'v\.\(.*\)'/\1/p" TheiaMCR/TheiaMCR.py)
+          echo "release tag: $TAG   pyproject.toml: $PROJECT_VERSION   MCR_REVISION: $MODULE_VERSION"
+          if [ "$TAG" != "v$PROJECT_VERSION" ] || [ "$PROJECT_VERSION" != "$MODULE_VERSION" ]; then
+            echo "::error::Release tag, pyproject.toml version and MCR_REVISION must match (e.g. v3.5.2, 3.5.2, v.3.5.2)"
+            exit 1
+          fi
+
+      - name: Build wheel and sdist
+        run: |
+          python -m pip install --upgrade build
+          python -m build
+
+      - name: Store the distribution
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9   # v7.0.2
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/TheiaMCR/
+    permissions:
+      id-token: write          # trusted publishing: PyPI accepts this workflow's identity instead of a token
+    steps:
+      - name: Download the distribution
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333   # v8.0.2
+        with:
+          name: dist
+          path: dist/
+
+      # also uploads a signed attestation (provenance) for each file
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086   # v1.14.3
+
+  verify:
+    name: Verify published files (PY-08)
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write          # attach the report to the release
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0   # v7.1.0
+        with:
+          python-version: '3.x'
+
+      - name: Check hashes, tampered file rejection and provenance
+        run: |
+          REPORT="CRA-PY08_TheiaMCR_${TAG}_PyPI_Integrity.md"
+          echo "REPORT=$REPORT" >> "$GITHUB_ENV"
+          python .github/scripts/verify_pypi_integrity.py --version "${TAG#v}" --require-provenance --wait 10 --output "$REPORT"
+
+      - name: Attach the report to the release
+        if: always() && env.REPORT != ''
+        run: '[ -f "$REPORT" ] && gh release upload "$TAG" "$REPORT" --clobber'

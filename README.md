@@ -97,12 +97,21 @@ Each motor has these variables available:
 More information about the available functions can be found in the [wiki](https://github.com/cliquot22/TheiaMCR/wiki) pages.   
 
 # Logging
-There are logging commands in the module using Python's logging libray.  These are set by default to log WARNING and higher levels.  To see other log prints in the console, initialize the class with `MCR = TheiaMCR.MCRControl("com4", moduleDebugLevel=True)` or manually set the logging level with `TheiaMCR.log.setLevel(logging.INFO)`.    
-The module creates 2 rotating log files in the background by default based on Python's logging module.  If the logging module isn't used, the log files can be disabled by calling `MCR = TheiaMCR.MCRControl("com4", logFiles=False)`.  
+The module logs through Python's logging library to the logger `TheiaMCR.TheiaMCR.MCRControl`, available as `TheiaMCR.log`.
+When `MCRControl()` is created it adds a console handler to this logger (INFO level, or DEBUG with `moduleDebugLevel=True`) and sets `propagate` to `False`, so its messages are not passed on to handlers on your root logger.
+To collect TheiaMCR messages in your own logging, add your handler to this logger, e.g. `TheiaMCR.log.addHandler(myHandler)`.
+The module does not add handlers to the root logger or to any of your loggers.
+
+The module creates 2 rotating log files in the background by default (`logA-<port>.txt` and `logB-<port>.txt` in `%LOCALAPPDATA%\TheiaMCR\log` on Windows or `~/.local/share/TheiaMCR/log` on Linux).
+With log files on, the logger level is DEBUG: the files record DEBUG and higher, and the console shows INFO and higher.
+The log files can be disabled by calling `MCR = TheiaMCR.MCRControl(<port>, logFiles=False)`.  The logger level is then not set by the module, so only WARNING and higher are shown unless you set it, e.g. `TheiaMCR.log.setLevel(logging.INFO)`.
+
+Connecting to and closing the serial port are logged at INFO, and lost connections at ERROR.  Rejected function arguments are logged at WARNING; very long values and board replies are shortened in the log message.
+Messages from the error list and from the log file handler use the loggers `TheiaMCR.errList` and `TheiaMCR.rotatingLogFiles`.  These pass messages on to your root logger as usual; if your program has not set up logging, Python prints WARNING and higher to the console.
 
 Unhandled exceptions are logged to the log file using the `sys.excepthook` variable.  This is a global variable so check the operation within your application if you set this variable elsewhere.  
 
-The error list variable records every error received.  These can be printed to the console with `error.printErrorListToLog`.  It continues to save errors and grow in memoroy until `error.clearErrorList()` is called.  
+The error list variable records every error received.  These can be printed to the log with `TheiaMCR.printErrorListToLog()`.  It continues to save errors and grow in memory until `TheiaMCR.clearErrorList()` is called.  
 
 # License
 [Theia Technologies BSD-3-Clause license](https://github.com/cliquot22/TheiaMCR/blob/main/LICENSE)  

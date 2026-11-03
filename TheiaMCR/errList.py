@@ -1,5 +1,8 @@
 from inspect import currentframe
-import logging as log
+import logging
+
+# log to this module's logger (not the root logger, so the calling program's logging setup is not changed)
+_log = logging.getLogger(__name__)
 # global
 # store the error here that ends the program.  Read it out for display to the user.  
 finalError = []
@@ -33,7 +36,7 @@ def saveError(errNum:int, modNum:int, lineNum:int):
     - lineNum: line in the module
     '''
     global finalError
-    log.error(f'ERROR: {errNum} {decipher(errNum)} in module {module(modNum)}, ln {lineNum}')
+    _log.error(f'ERROR: {errNum} {decipher(errNum)} in module {module(modNum)}, ln {lineNum}')
     finalError.append([errNum, modNum, lineNum])
 
 # clear the error list
@@ -51,7 +54,7 @@ def printErrorListToLog():
     Print the error list in the console from the global finalError
     '''
     for error in finalError:
-        log.error(f'  {error[0]} {decipher(error[0])}, module {module(error[1])}, line {error[2]}')
+        _log.error(f'  {error[0]} {decipher(error[0])}, module {module(error[1])}, line {error[2]}')
     
 # decipher
 def decipher(errNum):

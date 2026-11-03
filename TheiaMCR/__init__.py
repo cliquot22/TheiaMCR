@@ -10,3 +10,6 @@ __credits__ = 'Theia Technologies'
 from .TheiaMCR import MCRControl, MCR_REVISION
 from .errList import *
 from .rotatingLogFiles import *
+
+# the module's logger (TheiaMCR.TheiaMCR.MCRControl), e.g. TheiaMCR.log.setLevel(logging.INFO) or TheiaMCR.log.addHandler(...)
+log = MCRControl.log

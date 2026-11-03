@@ -1,4 +1,17 @@
 # revision history
+    v.3.5.3 261102 logging changes for the CRA logging review (PY-13):
+                bug: errList logged to the root logger, so the first error added a console handler to the calling program's root logger
+                errList and rotatingLogFiles log to their own loggers (TheiaMCR.errList, TheiaMCR.rotatingLogFiles)
+                rotatingLogFiles and _initLogging use logging instead of print(); log folder errors don't include the folder path above DEBUG
+                serial port opened and closed are logged at INFO (were DEBUG)
+                log file path (includes the user name) is logged at DEBUG (was INFO)
+                long rejected argument values and board replies are shortened in log messages
+                TheiaMCR.log is the module logger (TheiaMCR.TheiaMCR.MCRControl) so TheiaMCR.log.setLevel() and addHandler() work
+                README logging section updated
+                added publish-pypi workflow (PyPI trusted publishing with approval) and PyPI integrity check (PY-08)
+                added logging unit tests (PY-13)
+                cra-security-report workflow: actions pinned to commit SHAs, contents: write moved to the job (PY-09)
+                added Dependabot updates for the GitHub Actions pins and a repository controls evidence script (PY-09)
     v.3.5.2 261005 bug: unhandled exception hook no longer hides exceptions when logging is not configured (prints standard traceback)
                 log message identifies whether the exception came from TheiaMCR or the calling program
                 KeyboardInterrupt passed to the default exception hook

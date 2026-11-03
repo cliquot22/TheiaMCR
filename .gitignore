@@ -12,3 +12,4 @@ TheiaMCR.test
 .vscode
 todo*
 tests/CRA-TR-*.md
+CRA-GHS-*/

@@ -1,0 +1,12 @@
+# Dependabot version updates for the GitHub Actions used in .github/workflows (CRA-RA-002 PY-09).
+# The actions are pinned to commit SHAs; Dependabot opens a pull request to move each pin (and its version
+# comment) to a new release.  Review and merge the pull request on GitHub.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      github-actions:
+        patterns: ["*"]

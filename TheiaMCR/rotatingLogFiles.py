@@ -10,6 +10,9 @@ import logging
 import os
 import errno
 
+# messages about the log files themselves (a separate logger so they never go back into the log file handler)
+_log = logging.getLogger(__name__)
+
 class rotatingLogFiles(logging.Handler):
     '''
     Create a rotating log file handler that alternates between two log files.
@@ -93,7 +96,7 @@ class rotatingLogFiles(logging.Handler):
             appDataPath = os.getenv('LOCALAPPDATA')
             if appDataPath is None:
                 # Handle the case where LOCALAPPDATA is not set (rare)
-                print("LOCALAPPDATA environment variable not set. Using current directory.")
+                _log.warning('LOCALAPPDATA environment variable not set. Using the current directory for the log files.')
                 appDataPath = os.getcwd() #use current directory if no env variable
             basePath = os.path.join(appDataPath, 'TheiaMCR', 'log')
         else:  # Linux, macOS, etc.
@@ -106,11 +109,13 @@ class rotatingLogFiles(logging.Handler):
         except OSError as e:
             if e.errno == errno.EACCES:
                 # Permission error for creating the folder
-                print(f'Permission error creating the log folder: {e}')
+                _log.warning(f'Permission error creating the log folder ({e.strerror})')
+                _log.debug(f'Log folder error: {e}')
                 return [None, None]
             else:
                 # other OS error
-                print(f'Error creating log files: {e}')
+                _log.warning(f'Error creating the log folder ({e.strerror})')
+                _log.debug(f'Log folder error: {e}')
                 return [None, None]
 
         nameKey = nameKey.strip('\\/').split('\\')[-1].split('/')[-1]
@@ -165,7 +170,8 @@ class rotatingLogFiles(logging.Handler):
                 os.remove(filename)
                 logLength = 0
             except Exception as delete_error:
-                print(f"Error deleting {filename}: {delete_error}")
+                _log.warning(f'Error deleting log file {os.path.basename(filename)} ({type(delete_error).__name__})')
+                _log.debug(f'Log file delete error: {delete_error}')
                 return None, -1
 
         handle = open(filename, 'a')

@@ -28,7 +28,7 @@ log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
 # internal constants used across the classes in this module.  
-MCR_REVISION = 'v.3.5.2'
+MCR_REVISION = 'v.3.5.3'
 
 RESPONSE_READ_TIME = 500                # (ms) max time for the MCR to post a response in the buffer
 MCR_FOCUS_MOTOR_ID = 0x01               # motor ID's as specified in the motor control documentation
@@ -104,6 +104,14 @@ sys.excepthook = unhandledException
 ##### input parameter checks #####################################
 MCR_MAX_COMMAND_VALUE = 0xFFFF        # steps and speeds are sent to the board as 2 bytes
 
+MCR_LOG_VALUE_LENGTH = 40             # maximum characters of a caller value or board reply shown in a log message
+
+def _shortText(text:str, maxLength:int=MCR_LOG_VALUE_LENGTH) -> str:
+    '''
+    Shorten text for a log message so a very long caller value or board reply can't fill the log.
+    '''
+    return text if len(text) <= maxLength else f'{text[:maxLength]}... ({len(text)} characters)'
+
 def _checkInt(name:str, value, minValue:int, maxValue:int) -> int | None:
     '''
     Check a numeric input parameter from the calling program before it is used to build a board command.
@@ -117,7 +125,7 @@ def _checkInt(name:str, value, minValue:int, maxValue:int) -> int | None:
     [the value as an integer | None if the value is not a finite number or is out of range]
     '''
     if isinstance(value, bool) or not isinstance(value, numbers.Real) or not math.isfinite(value):
-        MCRControl.log.warning(f'Invalid {name} ({value!r}), must be a number')
+        MCRControl.log.warning(f'Invalid {name} ({_shortText(repr(value))}), must be a number')
         return None
     value = int(round(value))
     if value < minValue or value > maxValue:
@@ -133,7 +141,7 @@ def _checkBool(name:str, value) -> bool | None:
     '''
     if isinstance(value, numbers.Integral) and value in (0, 1):
         return bool(value)
-    MCRControl.log.warning(f'Invalid {name} ({value!r}), must be True or False')
+    MCRControl.log.warning(f'Invalid {name} ({_shortText(repr(value))}), must be True or False')
     return None
 
 def _checkMotorInit(motorName:str, steps, pi, move, accel) -> tuple[int, int, bool, int] | None:
@@ -457,7 +465,7 @@ class MCRControl():
                 
                 try:
                     self.serialPort.close()
-                    MCRControl.log.debug('Serial port closed')
+                    MCRControl.log.info(f'Serial port {self.serialPortName} closed')
                 except Exception as e:
                     MCRControl.log.error(f'Exception during serial port close: {e}')
                 
@@ -537,7 +545,7 @@ class MCRControl():
                     for handler in nullHandlers:
                         MCRControl.log.removeHandler(handler)
                     self.fileLogHandler = rotLogFiles.rotatingLogFiles(MCRControl.log, nameKey=serialPortName)
-                    MCRControl.log.info(f'Log file path {path.split(self.fileLogHandler.filenames[0])[0]}')
+                    MCRControl.log.debug(f'Log file path {path.split(self.fileLogHandler.filenames[0])[0]}')
                 except Exception as e:
                     MCRControl.log.error(f'Failed to set up file logging: {e}')
                     # Continue without file logging, but don't fail completely
@@ -571,7 +579,7 @@ class MCRControl():
 
         except Exception as e:
             # Fallback logging if everything fails
-            print(f'Critical error in _initLogging: {e}')
+            MCRControl.log.error(f'Critical error in _initLogging: {e}')
             return False
 
     ############## Depricated functions (moved from controllerClass to motor class in v.3.0.0) ###########
@@ -1039,7 +1047,7 @@ class MCRControl():
                     _,  # carriage return
                 ) = response
             except ValueError as e:
-                MCRControl.log.error(f"Failed to parse read motor values response [{', '.join([f'{int(x):02X}' for x in response])}] ({e})")
+                MCRControl.log.error(f"Failed to parse read motor values response [{_shortText(', '.join([f'{int(x):02X}' for x in response]))}] ({e})")
                 if self.parent.boardCommunicationState:
                     # no response or incorrect response from the board
                     err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
@@ -1411,7 +1419,7 @@ class MCRControl():
                     res = res[i:i+12]
                     break
             if len(res) > 12: 
-                MCRControl.log.warning("Warning: MCR board response too long ({})".format(":".join("{:02x}".format(c) for c in res)))
+                MCRControl.log.warning("Warning: MCR board response too long ({})".format(_shortText(":".join("{:02x}".format(c) for c in res))))
                 if self.parent.boardCommunicationState:
                     err.saveError(err.ERR_NO_COMMUNICATION, err.MOD_MCR, err.errLine())
                 else:
@@ -1662,7 +1670,7 @@ class MCRControl():
                         stopbits=serial.STOPBITS_ONE,
                     )
                     success = 0
-                    MCRControl.log.debug(f"Serial communication opened on {serialPortName} successfully")
+                    MCRControl.log.info(f"Serial communication opened on {serialPortName} successfully")
                 except serial.SerialException as e:
                     self.serialPortException = str(e)  # Store exception message
                     error_msg = str(e).lower()
